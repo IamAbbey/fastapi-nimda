@@ -1,0 +1,4 @@
+graft fastapi_nimda/static
+graft fastapi_nimda/templates
+exclude tests/*
+prune tests
