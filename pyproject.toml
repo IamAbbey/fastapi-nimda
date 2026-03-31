@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "A lightweight admin interface for FastAPI applications using SQLAlchemy or SQLModel."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "fastapi-nimda contributors" },
 ]
@@ -17,7 +17,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: FastAPI",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -53,11 +52,18 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["fastapi_nimda*"]
+exclude = ["tests", "tests.*"]
 
 [tool.setuptools.package-data]
 fastapi_nimda = [
+    "templates/*.html",
     "templates/**/*.html",
-    "static/**/*",
+    "static/src/*",
+    "static/dist/*",
+    "static/dist/js/*",
+    "static/dist/vendor/flowbite/*",
+    "static/dist/vendor/jquery/*",
+    "static/dist/vendor/select2/*",
 ]
 
 [dependency-groups]
