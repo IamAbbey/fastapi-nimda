@@ -1,12 +1,8 @@
-# Python-generated files
 __pycache__/
-*.py[oc]
-build/
+.pytest_cache/
+.ruff_cache/
+node_modules/
 dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-.vscode
-node_modules
+build/
+*.egg-info/
+*.db

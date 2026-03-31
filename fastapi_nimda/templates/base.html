@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flowbite Flask</title>
+    <title>{{ site_title }}</title>
     <link rel="stylesheet" href="/admin/static/dist/vendor/select2/select2.min.css">
-    <link rel="stylesheet" href="/admin/static/dist/output.css?v=9">
+    <link rel="stylesheet" href="/admin/static/dist/output.css?v=943">
     <script>
         // On page load or when changing themes, best to add inline in `head` to avoid FOUC
         if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -64,9 +64,9 @@
                 <img
                   src="https://flowbite.s3.amazonaws.com/logo.svg"
                   class="mr-3 h-8"
-                  alt="Flowbite Logo"
+                  alt="{{ site_header }}"
                 />
-                <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">Flowbite</span>
+                <span class="self-center text-2xl font-semibold whitespace-nowrap dark:text-white">{{ site_header }}</span>
               </a>
             </div>
             <div class="flex items-center lg:order-2">
@@ -294,7 +294,7 @@
                     ></path>
                   </svg>
                   <span class="flex-1 ml-3 text-left whitespace-nowrap"
-                    >Models</span
+                    >Navigation</span
                   >
                   <svg
                     aria-hidden="true"
@@ -312,14 +312,23 @@
                 </button>
                 <ul id="dropdown-pages" class="show py-2 space-y-2">
                   
-                  {% for resource in resources %}
+                  {% for group in resources|groupby('group') %}
+                    <li class="px-2 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ group.grouper }}</li>
+                    {% for resource in group.list %}
                     <li>
                       <a
-                        href="{{ url_for('admin_list', identity=resource.identity) }}"
-                        class="flex items-center p-2 pl-11 w-full text-base font-medium text-gray-900 rounded-lg transition duration-75 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
-                        >{{resource.table_name}}</a
-                      >
+                        href="{{ resource.url }}"
+                        class="flex items-center gap-2 p-2 pl-11 w-full text-base font-medium text-gray-900 rounded-lg transition duration-75 group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+                        >
+                        {% if resource.icon %}
+                        {% set icon_name = resource.icon %}
+                        {% set icon_class = "h-4 w-4 shrink-0" %}
+                        {% include "/component/icon.html" %}
+                        {% endif %}
+                        <span>{{ resource.label }}</span>
+                      </a>
                     </li>
+                    {% endfor %}
                   {% endfor %}
                   
                 </ul>
@@ -621,9 +630,9 @@
           </div>
         </aside>
     
-        <main class="p-4 md:ml-64 h-dvh overflow-scroll pt-20">
-          
-          <div class="mb-6">
+        <main class="h-dvh overflow-y-auto pb-8 pt-20 md:ml-64 md:px-6 lg:px-8">
+          <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
+          <div>
           {% block breadcrumb %}
           
           {% endblock breadcrumb %}
@@ -636,17 +645,23 @@
           {% block content %}
             
           {% endblock content %}
-            
+          </div>
         </main>
       </div>
 
 
         
 
+    <script src="https://unpkg.com/lucide@0.511.0/dist/umd/lucide.min.js"></script>
     <script src="/admin/static/dist/vendor/flowbite/flowbite.min.js"></script>
     <script src="/admin/static/dist/vendor/jquery/jquery.min.js"></script>
     <script src="/admin/static/dist/vendor/select2/select2.full.min.js"></script>
     <script src="/admin/static/dist/js/theme.js"></script>
+    <script>
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    </script>
 
     
     {% block extraJS %}
@@ -655,4 +670,3 @@
       
 </body>
 </html>
-

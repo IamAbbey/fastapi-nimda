@@ -1,9 +1,13 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "fastapi-nimda"
 version = "0.1.0"
 description = "A lightweight admin interface for FastAPI applications using SQLAlchemy or SQLModel."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
     { name = "fastapi-nimda contributors" },
@@ -15,11 +19,10 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -33,5 +36,31 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "pytest>=8.3.5",
     "ruff>=0.11.7",
+    "mypy>=1.19.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["fastapi_nimda*"]
+
+[tool.setuptools.package-data]
+fastapi_nimda = [
+    "templates/**/*.html",
+    "static/**/*",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
 ]

@@ -11,7 +11,9 @@ This plan is organized in the order that reduces risk first:
 3. add tests around current behavior
 4. expand features only after the core is reliable
 
-## Phase 1: Define the Package Boundary
+## DONE Phase 1: Define the Package Boundary
+
+Status: complete
 
 ### Objectives
 
@@ -31,13 +33,23 @@ This plan is organized in the order that reduces risk first:
 - document supported ORM patterns and current limitations
 - decide whether SQLModel is a first-class target or only a compatible layer on top of SQLAlchemy
 
+Completed so far:
+
+- define the intended top-level exports in `fastapi_nimda/__init__.py`
+- decide that `FastAPINimda` is the canonical public app class name and `Admin` is a compatibility alias
+- document the required integration flow in `README.md`
+- document supported ORM patterns and current limitations in `README.md`
+- decide that SQLAlchemy declarative models are the core support target and SQLModel table models are a first-class supported integration when they fit the same ORM shape
+
 ### Deliverables
 
 - cleaned public package exports
 - documented supported use cases
 - documented unsupported cases
 
-## Phase 2: Restructure the Repository for Packaging
+## DONE Phase 2: Restructure the Repository for Packaging
+
+Status: complete
 
 ### Objectives
 
@@ -93,13 +105,29 @@ fastapi-nimda/
 - add classifiers, license, authorship, URLs, and a real description to `pyproject.toml`
 - add build settings so wheel/sdist packaging is explicit and repeatable
 
+Completed so far:
+
+- move `main.py` and `main2.py` into `examples/`
+- move `archetecture.md` into `docs/architecture.md`
+- archive scratch files such as `test.py`, `admin copy.py`, `base copy.html`, and `table copy.html`
+- decide that generated sample databases should not live at the repository root and should be ignored from version control going forward
+- ensure package data includes templates and static assets during build/publish
+- add classifiers, license, authorship, and a real description to `pyproject.toml`
+- add build settings so wheel/sdist packaging is explicit and repeatable
+
+Note:
+
+- project URLs were not added because there is no configured upstream repository URL in local git metadata yet
+
 ### Deliverables
 
 - cleaner repository layout
 - example apps isolated from library code
 - package metadata ready for publishing
 
-## Phase 3: Split Internal Responsibilities
+## DONE Phase 3: Split Internal Responsibilities
+
+Status: complete
 
 ### Objectives
 
@@ -137,12 +165,25 @@ Break `ModelAdmin` responsibilities into collaborators:
 - keep route handlers thin by moving write flows into service functions
 - centralize ORM and DB error normalization
 
+Completed so far:
+
+- extract model inspection into `fastapi_nimda/inspection.py`
+- extract query construction into `fastapi_nimda/queries.py`
+- extract form assembly and validation into `fastapi_nimda/forms.py`
+- extract registry behavior into `fastapi_nimda/registry.py`
+- extract write flows into `fastapi_nimda/services.py`
+- reduce `fastapi_nimda/admin.py` to the public configuration facade over internal collaborators
+- keep route handlers thinner by delegating add and edit write operations to the service layer
+- keep the public `ModelAdmin` API intact while moving framework-internal behavior behind it
+
 ### Deliverables
 
 - smaller units with clearer ownership
 - easier testing around isolated behavior
 
-## Phase 4: Stabilize URL and Registry Design
+## DONE Phase 4: Stabilize URL and Registry Design
+
+Status: complete
 
 ### Objectives
 
@@ -159,12 +200,25 @@ Break `ModelAdmin` responsibilities into collaborators:
 - validate uniqueness during registration
 - ensure the slug is what appears in URLs and templates
 
+Completed so far:
+
+- replace generated numeric keys with deterministic registry slugs
+- support slug selection in this order:
+  - explicit `ModelAdmin.slug`
+  - model table name
+  - model class name lowercased and slugified
+- validate slug uniqueness during registration
+- propagate the chosen slug into registered resources and modeladmin instances
+- keep the slug as the identity used by routes, dependencies, and templates
+
 ### Deliverables
 
 - predictable URLs
 - safer registration behavior
 
 ## Phase 5: Build a Real Test Suite
+
+Status: not started
 
 ### Objectives
 
@@ -201,6 +255,8 @@ Break `ModelAdmin` responsibilities into collaborators:
 
 ## Phase 6: Improve Documentation
 
+Status: in progress
+
 ### Objectives
 
 - make the project understandable to new users
@@ -230,7 +286,9 @@ Break `ModelAdmin` responsibilities into collaborators:
 - usable onboarding docs
 - lower maintenance cost from fewer implicit decisions
 
-## Phase 7: Hardening and Behavior Corrections
+## DONE Phase 7: Hardening and Behavior Corrections
+
+Status: complete
 
 ### Objectives
 
@@ -246,12 +304,24 @@ Break `ModelAdmin` responsibilities into collaborators:
 - review typing across the package
 - audit naming consistency, including `FastAPINimda` versus package branding
 
+Completed so far:
+
+- explicitly reject composite primary keys during model inspection with a package-level configuration error
+- explicitly reject unsupported many-to-many and one-to-many form fields instead of silently skipping them
+- block file uploads with clear request-time messaging and reject file widgets at admin configuration time
+- replace the old table-name string splitting with structured SQLite-oriented database error summaries for unique, not-null, foreign-key, and check constraint failures
+- tighten write transaction handling so failed add and edit flows roll back the active session before returning an error state
+- move the active package codebase to Python 3.10+ typing syntax and require Python 3.10 or newer in package metadata
+- standardize naming around `FastAPINimda` as the canonical class name while keeping `Admin` as a compatibility alias in the public surface and documentation
+
 ### Deliverables
 
 - fewer hidden edge cases
 - more predictable runtime behavior
 
 ## Phase 8: Good-to-Have Features
+
+Status: Admin UX Features and Customization Features complete
 
 These should come after packaging, tests, and API stabilization.
 
@@ -289,7 +359,21 @@ These should come after packaging, tests, and API stabilization.
 - CI for tests and linting
 - package publishing automation
 
+Completed so far:
+
+- add real list-page search, sorting, and filter controls with query-param persistence
+- support custom bulk actions in addition to the existing delete flow
+- improve list empty states and form validation feedback
+- render foreign-key values with inline related-object labels on list pages
+- expose configurable labels, icons, and navigation grouping in the admin UI
+- add model-level permission hooks for list, view, add, edit, delete, and custom actions
+- add model hooks for custom list queries plus pre-save and post-save behavior
+- support model-defined custom object action buttons
+- support type-based form field overrides alongside existing per-field widget overrides
+
 ## Phase 9: Packaging and Release Readiness
+
+Status: not started
 
 ### Objectives
 
@@ -325,8 +409,8 @@ These should come after packaging, tests, and API stabilization.
 
 If this were executed as a short-term roadmap, the highest-value next steps would be:
 
-1. clean `pyproject.toml` and package exports
-2. move example apps out of the repo root
+1. DONE: clean `pyproject.toml` and package exports
+2. DONE: move example apps out of the repo root
 3. create `tests/` and lock in current CRUD behavior
 4. replace numeric resource identities with stable slugs
-5. rewrite the README into a real quickstart and limitations guide
+5. DONE: rewrite the README into a real quickstart and limitations guide

@@ -1,43 +1,57 @@
 from fastapi import Request
-from typing import Any, Literal, List, Dict
-from pydantic import BaseModel, computed_field
+from typing import Any, Literal
+from pydantic import BaseModel
 
 
 class TemplateMessage(BaseModel):
     kind: Literal["info", "success", "error"] = "info"
     message: str
 
-    @computed_field
-    @property
     def color(self) -> str:
         if self.kind == "success":
             return "green"
-        elif self.kind == "error":
+        if self.kind == "error":
             return "red"
-        else:
-            return "blue"
+        return "blue"
 
 
 def add_template_message(
     request: Request, message: TemplateMessage
-) -> List[TemplateMessage]:
+) -> list[TemplateMessage]:
     messages = getattr(request.state, "messages", [])
     messages.append(message)
     request.state.messages = messages
+    return messages
 
 
-def add_template_message_context(request: Request) -> Dict[str, Any]:
+def add_template_message_context(request: Request) -> dict[str, Any]:
     return {"messages": getattr(request.state, "messages", [])}
 
 
-def add_template_models_context(request: Request) -> Dict[str, Any]:
-    _registered: Dict[str, Any] = getattr(request.app, "_registered", {})
+def add_template_models_context(request: Request) -> dict[str, Any]:
+    from .registry import build_model_admin
+
+    registered: dict[str, Any] = getattr(request.app, "register_resource", {})
     resources = []
-    for identity, value in _registered.items():
+    for identity, value in registered.items():
+        modeladmin = build_model_admin(value, request.app.engine)
+        if not modeladmin.has_module_permission(request):
+            continue
         resources.append(
             {
                 "identity": identity,
                 "table_name": value.model.__name__,
+                "label": modeladmin.get_label(),
+                "plural_label": modeladmin.get_plural_label(),
+                "group": modeladmin.get_navigation_group(),
+                "icon": modeladmin.get_navigation_icon(),
+                "url": f"/admin/{identity}/list/",
             }
         )
-    return {"resources": resources}
+    site = getattr(request.app, "site", None)
+    return {
+        "resources": resources,
+        "site_header": getattr(site, "site_header", "") or "fastapi-nimda",
+        "site_title": getattr(site, "site_title", "") or "Admin",
+        "index_title": getattr(site, "index_title", "") or "Site administration",
+    }

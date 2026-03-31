@@ -1,106 +1,122 @@
 {% extends 'base.html' %}
 
 {% block breadcrumb %}
-{% with paths=[('', table_name), ('', 'List')] %}
+{% with paths=[('', plural_label), ('', 'List')] %}
 {% include "/component/breadcrumb.html" %}
 {% endwith %}
 {% endblock breadcrumb %}
 
 {% block content %}
-
-<div class="flex flex-wrap items-center justify-between my-3">
-    <p class="tex-xl">Select {{ table_name }} to change</p>
-    {% if can_perform_add %}
-    <a href="{{ url_for('admin_add', identity=identity) }}"
-        class="flex items-center gap-1 uppercase px-5 py-2 me-2 mb-2 text-xs font-medium text-gray-900 focus:outline-none bg-gray-200 rounded-full border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
-        Add {{ table_name|pretty_name }} {% include "/component/plus_svg.html" %}
-    </a>
-    {% endif %}
-</div>
-
-<div class="relative overflow-x-auto sm:rounded-lg">
-    <div class="flex flex-wrap items-center justify-between gap-4 pb-4 bg-white dark:bg-gray-900">
-        <div class="flex items-center gap-2">
-            <select id="action-select"
-                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block w-60  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                <option value="">-------</option>
-                <option value="delete">Delete</option>
-                <option value="seed">Generate dummy value</option>
-                <option>France</option>
-                <option>Germany</option>
-            </select>
-            <button id="action-btn" type="button"
-                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm p-2.5 text-center inline-flex items-center me-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-                <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
-                    viewBox="0 0 14 10">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M1 5h12m0 0L9 1m4 4L9 9" />
-                </svg>
-                <span class="sr-only">Icon description</span>
-            </button>
-        </div>
-
-
+<div class="flex flex-col gap-6">
+    <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-            <label for="table-search" class="sr-only">Search</label>
-            <div class="relative">
-                <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
-                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true"
-                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" />
-                    </svg>
-                </div>
-                <input type="text" id="table-search"
-                    class="block pt-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg w-80 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                    placeholder="Search for items">
-            </div>
+            <p class="text-2xl font-semibold">{{ plural_label }}</p>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Search, sort, filter, and manage {{ plural_label|lower }}.</p>
         </div>
-
-
-
+        {% if can_perform_add %}
+        <a href="{{ url_for('admin_add', identity=identity) }}"
+            class="flex items-center gap-1 uppercase px-5 py-2 text-xs font-medium text-gray-900 focus:outline-none bg-gray-200 rounded-full border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
+            Add {{ label|pretty_name }} {% include "/component/plus_svg.html" %}
+        </a>
+        {% endif %}
     </div>
 
-    {% with columns=list_display, data=data, identity=identity, tablename=table_name, pk=pk %}
-    {% include "/component/table.html" %}
+    <form method="get" class="grid gap-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800 lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+        <div>
+            <label for="table-search" class="mb-2 block text-sm font-medium">Search</label>
+            <input type="text" id="table-search" name="q" value="{{ search_term }}"
+                class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                placeholder="Search {{ plural_label|lower }}">
+        </div>
+        {% for filter in available_filters %}
+        <div>
+            <label for="filter-{{ filter.name }}" class="mb-2 block text-sm font-medium">{{ filter.label }}</label>
+            <select id="filter-{{ filter.name }}" name="filter__{{ filter.name }}"
+                class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                <option value="">All</option>
+                {% for option in filter.options %}
+                <option value="{{ option.value }}" {% if active_filters[filter.name] == option.value %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endfor %}
+        <div class="flex items-end gap-2 {% if not available_filters %}lg:col-start-4{% endif %}">
+            <button type="submit" class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700">Apply</button>
+            <a href="{{ url_for('admin_list', identity=identity) }}" class="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700">Reset</a>
+        </div>
+    </form>
+
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 px-4 py-4 dark:border-gray-700">
+            <form id="bulk-action-form" action="{{ url_for('admin_action_post', identity=identity) }}" method="post" class="flex items-center gap-2">
+                <input type="hidden" id="bulk-action-keys" name="keys" value="">
+                <select id="action-select" name="action"
+                    class="block w-60 rounded-md border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                    <option value="">Choose action</option>
+                    {% for action in bulk_actions %}
+                    <option value="{{ action.name }}">{{ action.label }}</option>
+                    {% endfor %}
+                </select>
+                <button id="action-btn" type="submit"
+                    class="rounded-lg bg-blue-700 p-2.5 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700">
+                    Apply
+                </button>
+            </form>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ count }} total</p>
+        </div>
+
+        {% with data=data, identity=identity, pk=pk %}
+        {% include "/component/table.html" %}
+        {% endwith %}
+    </div>
+
+    {% if data %}
+    {% with count=count, paginator=paginator %}
+    {% include "/component/pagination.html" %}
     {% endwith %}
-
+    {% endif %}
 </div>
-
-{% if data %}
-{% with count=count, pagination=pagination %}
-{% include "/component/pagination.html" %}
-{% endwith %}
-{% endif %}
-
-
 {% endblock content %}
 
 {% block extraJS %}
 <script>
     $(document).ready(function () {
-        const deleteURL = "{{ url_for('admin_delete', identity=identity) }}"
-        
-        $('#action-btn').on('click', function () {
-            const action = $("#action-select").val();
-            if (action == null || action == "") {
-                return;
-            }
+        const deleteURL = "{{ url_for('admin_delete', identity=identity) }}";
+
+        function getSelectedRecordIds() {
             const recordIds = [];
-            $('input[type="checkbox"][data-record-id]').each(function (index, element) {
-                const isChecked = $(this, element).is(':checked');
-                if (isChecked) {
-                    const recordId = $(this, element).data("record-id")
-                    console.log(recordId);
-                    recordIds.push(recordId);
+            $('input[type="checkbox"][data-record-id]').each(function () {
+                if ($(this).is(':checked')) {
+                    recordIds.push($(this).data("record-id"));
                 }
             });
+            return recordIds;
+        }
 
-            if (recordIds && action == "delete") {
-                const delete_get_url = deleteURL + "?keys=" + recordIds.join(",");
-                window.location = delete_get_url;
+        $('#checkbox-all-search').on('change', function () {
+            const checked = $(this).is(':checked');
+            $('input[type="checkbox"][data-record-id]').prop('checked', checked);
+        });
+
+        $('#bulk-action-form').on('submit', function (event) {
+            const action = $("#action-select").val();
+            const recordIds = getSelectedRecordIds();
+            $("#bulk-action-keys").val(recordIds.join(","));
+
+            if (!action) {
+                event.preventDefault();
+                return;
             }
 
+            if (!recordIds.length) {
+                event.preventDefault();
+                return;
+            }
+
+            if (action === "delete") {
+                event.preventDefault();
+                window.location = deleteURL + "?keys=" + recordIds.join(",");
+            }
         });
     });
 </script>

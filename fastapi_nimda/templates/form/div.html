@@ -1,9 +1,14 @@
-<div class="flex flex-col gap-2 p-2 mt-4">
+<div class="flex flex-col gap-1">
     {% for name, _field in fields.items() %}
-        <div class="border-b border-gray-200 dark:border-gray-600">
-            <div class="flex flex-wrap pb-4 pt-2 items-center max-w-3xl">
-                <div class="w-40 {% if _field.error %} error_class {% endif %}">{{ _field.label|safe }}</div>
-                <div class="grow {% if _field.error %} error_class {% endif %}">{{ _field.field|safe }}</div>
+        <div class="border-b border-gray-200 py-4 last:border-b-0 dark:border-gray-700 {% if _field.error %}rounded-lg bg-red-50/70 px-3 dark:bg-red-950/20{% endif %}">
+            <div class="flex max-w-3xl flex-col gap-2 md:flex-row md:items-start md:gap-6">
+                <div class="w-full shrink-0 text-sm font-medium md:w-40 {% if _field.error %}text-red-700 dark:text-red-300{% endif %}">{{ _field.label|safe }}</div>
+                <div class="grow {% if _field.error %}text-red-700 dark:text-red-300{% endif %}">
+                    {{ _field.field|safe }}
+                    {% if _field.help_text %}
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ _field.help_text }}</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
     {% endfor %}

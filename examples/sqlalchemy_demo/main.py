@@ -1,17 +1,14 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi_nimda import FastAPINimda, ModelAdmin
+from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import Mapped
-from sqlalchemy.orm import mapped_column
-from typing import List
-from fastapi_nimda.admin import ModelAdmin
-from fastapi_nimda.app import FastAPINimda
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column, sessionmaker
 from sqlalchemy.orm import relationship
 
-
-sqlite_file_name = "database_test.db"
+BASE_DIR = Path(__file__).resolve().parent
+sqlite_file_name = BASE_DIR / "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
 
 engine = create_engine(sqlite_url)
@@ -34,7 +31,7 @@ class Item(Base):
     name = Column(String, index=True)
     description = Column(String, index=True)
     # room_id: Mapped[int] = mapped_column(ForeignKey("room.id"))
-    room: Mapped[List["Room"]] = relationship(
+    room: Mapped[list["Room"]] = relationship(
         "Room",
         primaryjoin="Room.id == Item.id",
         foreign_keys="Room.id",
@@ -45,7 +42,7 @@ class Room(Base):
     __tablename__ = "room"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    items: Mapped[List["Item"]] = relationship(lazy="selectin")
+    items: Mapped[list["Item"]] = relationship(lazy="selectin")
 
 
 Base.metadata.create_all(bind=engine)

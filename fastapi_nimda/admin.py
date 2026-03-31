@@ -1,62 +1,57 @@
 from __future__ import annotations
 
-import typing
-from sqlalchemy.orm import DeclarativeBase, selectinload
-from sqlalchemy.inspection import inspect
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.orm.interfaces import RelationshipDirection
-from sqlalchemy.sql.sqltypes import Integer, String, Boolean, Float
-from sqlalchemy import select, update, delete, insert
-from sqlalchemy.sql import func
+from copy import deepcopy
+from typing import Any, Literal
 
-from fastapi_nimda.widgets import (
-    SelectMultiple,
-    TextInput,
-    Widget,
-    NumberInput,
-    CheckboxInput,
-    Select,
-)
-from .templating.templating import templates
-from .operation import OperationKind
-from sqlalchemy.orm.relationships import RelationshipProperty
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
-from sqlalchemy import tuple_
-from dataclasses import dataclass
+from sqlalchemy.inspection import inspect
+from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy.orm.interfaces import RelationshipDirection
+from sqlalchemy.orm.relationships import RelationshipProperty
+from sqlalchemy.sql.schema import Column
+from sqlalchemy.sql.sqltypes import String
 
-if typing.TYPE_CHECKING:
-    from typing import Type, List, Literal, Union, Dict, Iterable, Any, Optional
-
-
-@dataclass
-class ColumnWidget:
-    column: Column
-    widget: Widget
+from .errors import UnknownAdminActionError, UnsupportedRelationshipError
+from .forms import AdminForm
+from .inspection import get_model_primary_keys, inspect_model
+from .operation import OperationKind
+from .queries import ModelQueryBuilder
+from .widgets import Widget
 
 
 class ModelAdmin:
-    list_display: List[str] = []
-    """
-    Set list_display to control which fields are displayed on the change list page of the admin.
-    If you do not set list_display, the admin site will display a single column that displays the __str__() representation of each object.
-    """
-
-    readonly_fields: List[str] = []
-    raw_id_fields: List[str] = []
-    fields: Union[List[str], Literal["__all__"]] = "__all__"
-    exclude: List[str] = []
-    widgets: Dict[str, Widget] = {}
+    list_display: list[str] = []
+    readonly_fields: list[str] = []
+    raw_id_fields: list[str] = []
+    fields: list[str] | Literal["__all__"] = "__all__"
+    exclude: list[str] = []
+    widgets: dict[str, Widget] = {}
+    formfield_overrides: dict[type, Widget | type[Widget]] = {}
+    field_labels: dict[str, str] = {}
+    field_help_texts: dict[str, str] = {}
     page_size: int = 20
-    list_order_by: List[str] = []
+    list_order_by: list[str] = []
+    search_fields: list[str] = []
+    list_filter: list[str] = []
+    sortable_fields: list[str] = []
+    actions: dict[str, str] = {}
+    slug: str | None = None
+    label: str | None = None
+    plural_label: str | None = None
+    navigation_group: str = "Models"
+    icon: str | None = None
 
-    def __init__(self, *, model: Type[DeclarativeBase], engine: Engine) -> None:
+    def __init__(self, *, model: type[DeclarativeBase], engine: Engine) -> None:
         self.engine = engine
-        self._model: Type[DeclarativeBase] = model
-        self._table_columns: Dict[str, Column] = {}
-        self._table_fk_columns: Dict[str, Column] = {}
-        self._table_rel_columns: Dict[str, RelationshipProperty] = {}
-        self.inspect_model()
+        self._model: type[DeclarativeBase] = model
+        self._identity: str | None = None
+        inspection = inspect_model(model)
+        self._table_columns = inspection.table_columns
+        self._table_fk_columns = inspection.table_fk_columns
+        self._table_rel_columns = inspection.table_rel_columns
+        self._supported_form_fields = inspection.supported_form_fields
+        self._unsupported_relation_fields = inspection.unsupported_relation_fields
+        self._query_builder = ModelQueryBuilder(self)
         self._validate_attributes()
 
     def get_page_size(self):
@@ -65,100 +60,29 @@ class ModelAdmin:
     def get_list_display(self):
         return self.list_display
 
-    def get_list_query_count_stmt(self):
-        return select(func.count()).select_from(self.model)
+    def get_list_query_count_stmt(self, **kwargs):
+        return self._query_builder.get_list_query_count_stmt(**kwargs)
 
-    def perform_edit(self, request, obj, form):
-        pass
-
-    def get_list_query_stmt(self):
-        query = select(self.model)
-        if self.get_list_display():
-            query = select(
-                *[getattr(self.model, field) for field in self.get_list_display()]
-            )
-        if self.list_order_by:
-            return query.order_by(
-                *[getattr(self.model, field) for field in self.list_order_by]
-            )
-
-        return query.order_by(tuple_(*self.get_primary_key_as_model_column())).limit(
-            self.page_size
-        )
+    def get_list_query_stmt(self, **kwargs):
+        return self._query_builder.get_list_query_stmt(**kwargs)
 
     def get_primary_key_as_model_column(self):
-        primary_key_fields = self.get_model_primary_keys()
-        primary_key_as_model_column = [
-            getattr(self.model, field) for field in primary_key_fields
-        ]
-        return primary_key_as_model_column
+        return self._query_builder.get_primary_key_as_model_column()
 
-    def get_update_record_stmt(self, key: List[str]):
-        return update(self.model.__table__).where(
-            tuple_(*self.get_primary_key_as_model_column()) == key
-        )
+    def get_update_record_stmt(self, key: list[str]):
+        return self._query_builder.get_update_record_stmt(key)
 
-    def get_delete_record_stmt(self, key: List[str]):
-        return delete(self.model.__table__).where(
-            tuple_(*self.get_primary_key_as_model_column()) == key
-        )
+    def get_delete_record_stmt(self, key: list[str]):
+        return self._query_builder.get_delete_record_stmt(key)
 
     def get_insert_record_stmt(self):
-        return insert(self.model.__table__).returning(
-            self.get_primary_key_as_model_column()[0]
-        )
-        # we using lastrowid as SQLite only added support for RETURNING in version 3.35.0 (March 2021).
-        # return insert(self.model.__table__)
+        return self._query_builder.get_insert_record_stmt()
 
-    def get_single_record_query_stmt(self, key: List[str]):
-        # if len(key) != len(primary_key_fields):
-        #     raise ValueError('Querying keys length differs')
+    def get_single_record_query_stmt(self, key: list[str]):
+        return self._query_builder.get_single_record_query_stmt(key)
 
-        # https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html#relationship-loading-techniques
-        # print(self._table_rel_columns.items())
-        # print([
-        #                 getattr(self.model, field)
-        #                 for field, item in self._table_rel_columns.items()
-        #                 if item.secondary is not None # we do not support many-to-many
-        #             ])
-        return (
-            select(self.model)
-            .options(
-                selectinload(
-                    *[
-                        getattr(self.model, field)
-                        for field, item in self._table_rel_columns.items()
-                        if item.secondary is None  # we do not support many-to-many
-                    ]
-                )
-            )
-            .where(tuple_(*self.get_primary_key_as_model_column()) == key)
-        )
-
-    def get_multi_record_query_stmt(self, keys: List[str]):
-        # if len(key) != len(primary_key_fields):
-        #     raise ValueError('Querying keys length differs')
-
-        # https://docs.sqlalchemy.org/en/20/orm/queryguide/relationships.html#relationship-loading-techniques
-        # print(self._table_rel_columns.items())
-        # print([
-        #                 getattr(self.model, field)
-        #                 for field, item in self._table_rel_columns.items()
-        #                 if item.secondary is not None # we do not support many-to-many
-        #             ])
-        return (
-            select(self.model)
-            .options(
-                selectinload(
-                    *[
-                        getattr(self.model, field)
-                        for field, item in self._table_rel_columns.items()
-                        if item.secondary is None  # we do not support many-to-many
-                    ]
-                )
-            )
-            .where(self.get_primary_key_as_model_column()[0].in_(keys))
-        )
+    def get_multi_record_query_stmt(self, keys: list[str]):
+        return self._query_builder.get_multi_record_query_stmt(keys)
 
     @property
     def model(self):
@@ -169,57 +93,30 @@ class ModelAdmin:
         return self._table_columns
 
     @property
+    def table_fk_columns(self):
+        return self._table_fk_columns
+
+    @property
+    def table_rel_columns(self):
+        return self._table_rel_columns
+
+    @property
     def table_name(self):
         return self.model.__name__
 
     @property
     def all_columns(self):
-        return {**self._table_columns, **self._table_rel_columns}
-        # return {**self._table_columns, **self._table_fk_columns}
+        return {
+            **self._table_columns,
+            **self._table_fk_columns,
+            **self._table_rel_columns,
+        }
 
-    def inspect_model(self):
-        mapper = inspect(self.model)
-        # print(mapper.column_attrs.keys())
-        # print(list(mapper.columns))
+    @property
+    def unsupported_relation_fields(self):
+        return self._unsupported_relation_fields
 
-        def check_matching_relationship_exist(*, target_column: Column):
-            for rel_column in mapper.relationships:
-                if rel_column.mapper.tables[0].name == target_column.column.table.name:
-                    return True
-
-        # supports only a single column that can reference only one foreign key
-        for column in mapper.columns:
-            if column.foreign_keys and len(column.foreign_keys) > 1:
-                raise ValueError(
-                    f"{self.model.__name__} contains unsupported foreignkey column :{column.key}: "
-                    f"{column.key} can reference only one foreign key"
-                )
-            if column.foreign_keys and not column.primary_key:
-                # WE SHOULD ABLE TO HAVE foreign_key without relation object defined
-                # the relationship object only refers to the python layer and has not to do with the DB
-                if not check_matching_relationship_exist(
-                    target_column=list(column.foreign_keys)[0]
-                ):
-                    raise ValueError(
-                        f"{self.model.__name__} contains unsupported foreignkey column :{column.key}: "
-                        f"{self.model.__name__} needs to define relationship for :{column.key}:"
-                    )
-
-            if not column.foreign_keys:
-                self._table_columns[column.key] = column
-
-        # columns = [column for column in mapper.columns if not column.foreign_keys]
-        # print(mapper.local_table.foreign_keys)
-        for column in mapper.columns:
-            if column.foreign_keys:
-                self._table_fk_columns[column.key] = column
-            else:
-                self._table_columns[column.key] = column
-
-        for _column in mapper.relationships:
-            self._table_rel_columns[_column.key] = _column
-
-    def validate_fields_exist(self, fields: List[str], against: List[str]):
+    def validate_fields_exist(self, fields: list[str], against):
         for field in fields:
             if field not in against:
                 raise ValueError(
@@ -227,27 +124,37 @@ class ModelAdmin:
                 )
 
     def validate_list_display_like_attributes(self):
-        mapper = inspect(self.model)
-        for attr in ("list_display", "list_order_by"):
+        for attr in ("list_display",):
             if not isinstance(getattr(self, attr), (list, tuple)):
                 raise ValueError(
                     f"{self.__class__.__name__} Error: Invalid attribute :{attr}: must be sequence e.g list, tuple"
                 )
             try:
-                self.validate_fields_exist(
-                    getattr(self, attr), mapper.column_attrs.keys()
-                )
+                self.validate_fields_exist(getattr(self, attr), self.all_columns.keys())
             except ValueError as e:
                 raise ValueError(
                     f"{self.__class__.__name__} Error: Invalid attribute :{attr}: {e.args[0]}"
                 )
 
+        mapper = inspect(self.model)
+        if not isinstance(self.list_order_by, (list, tuple)):
+            raise ValueError(
+                f"{self.__class__.__name__} Error: Invalid attribute :list_order_by: must be sequence e.g list, tuple"
+            )
+        try:
+            self.validate_fields_exist(self.list_order_by, mapper.column_attrs.keys())
+        except ValueError as e:
+            raise ValueError(
+                f"{self.__class__.__name__} Error: Invalid attribute :list_order_by: {e.args[0]}"
+            )
+
     def validate_field_like_attributes(self):
         all_columns = self.all_columns.keys()
+        column_fields = {**self.table_columns, **self.table_fk_columns}.keys()
         if self.fields == "__all__":
-            self.fields = list(all_columns)
+            self.fields = list(self._supported_form_fields)
 
-        for attr in ("fields", "readonly_fields", "exclude", "list_order_by"):
+        for attr in ("fields", "readonly_fields", "exclude"):
             if not isinstance(getattr(self, attr), (list, tuple)):
                 raise ValueError(
                     f"{self.__class__.__name__} Error: Invalid attribute :{attr}: must be sequence e.g list, tuple"
@@ -259,25 +166,192 @@ class ModelAdmin:
                     f"{self.__class__.__name__} Error: Invalid attribute :{attr}: {e.args[0]}"
                 )
 
+        for attr in ("search_fields", "list_filter", "sortable_fields"):
+            if not isinstance(getattr(self, attr), (list, tuple)):
+                raise ValueError(
+                    f"{self.__class__.__name__} Error: Invalid attribute :{attr}: must be sequence e.g list, tuple"
+                )
+        try:
+            self.validate_fields_exist(list(self.search_fields), column_fields)
+            self.validate_fields_exist(list(self.list_filter), column_fields)
+            self.validate_fields_exist(list(self.sortable_fields), column_fields)
+        except ValueError as e:
+            raise ValueError(
+                f"{self.__class__.__name__} Error: Invalid attribute configuration: {e.args[0]}"
+            )
+
+        if not isinstance(self.actions, dict):
+            raise ValueError(
+                f"{self.__class__.__name__} Error: Invalid attribute :actions: must be a dict"
+            )
+        if not isinstance(self.field_labels, dict) or not isinstance(
+            self.field_help_texts, dict
+        ):
+            raise ValueError(
+                f"{self.__class__.__name__} Error: field label/help text configuration must be dict-like"
+            )
+        if not isinstance(self.formfield_overrides, dict):
+            raise ValueError(
+                f"{self.__class__.__name__} Error: Invalid attribute :formfield_overrides: must be a dict"
+            )
+
+    def validate_supported_field_usage(self):
+        for attr in (
+            "fields",
+            "readonly_fields",
+            "raw_id_fields",
+            "list_display",
+        ):
+            for field in getattr(self, attr):
+                if field in self.unsupported_relation_fields:
+                    raise UnsupportedRelationshipError(
+                        f"{self.__class__.__name__} Error: Invalid attribute :{attr}: "
+                        f"{field} is unsupported because {self.unsupported_relation_fields[field]}"
+                    )
+
+    def validate_actions(self):
+        for name, label in self.actions.items():
+            if not isinstance(name, str) or not isinstance(label, str) or not label:
+                raise ValueError(
+                    f"{self.__class__.__name__} Error: Invalid attribute :actions: every action needs a non-empty string name and label"
+                )
+            if not hasattr(self, f"handle_action_{name}"):
+                raise ValueError(
+                    f"{self.__class__.__name__} Error: Invalid attribute :actions: missing handler handle_action_{name}"
+                )
+
     def _validate_attributes(self):
         self.validate_field_like_attributes()
         self.validate_list_display_like_attributes()
-        # if not isinstance(self.exclude, (list, tuple)):
-        #     raise ValueError("exclude is not a sequence e.g list, tuple")
+        self.validate_supported_field_usage()
+        self.validate_actions()
 
     def get_model_admin_fields(self):
         return self.fields
 
-    def can_perform_add(self):
-        return len(self.get_model_admin_fields()) > 0
+    def get_label(self) -> str:
+        return self.label or self.table_name
+
+    def get_plural_label(self) -> str:
+        return self.plural_label or self.get_label()
+
+    def get_navigation_group(self) -> str:
+        return self.navigation_group or "Models"
+
+    def get_navigation_icon(self) -> str | None:
+        return self.icon
+
+    def can_perform_add(self, request=None):
+        return len(self.get_model_admin_fields()) > 0 and self.has_add_permission(
+            request
+        )
 
     def get_absolute_url(self):
         return f"/{self._identity}/list/"
 
+    def get_field_label(self, name: str) -> str:
+        return self.field_labels.get(name, name.replace("_", " ").capitalize())
+
+    def get_field_help_text(self, name: str) -> str | None:
+        return self.field_help_texts.get(name)
+
+    def get_default_search_fields(self) -> list[str]:
+        return [
+            name
+            for name, column in {**self.table_columns, **self.table_fk_columns}.items()
+            if isinstance(column.type, String)
+        ]
+
+    def get_search_fields(self) -> list[str]:
+        return list(self.search_fields or self.get_default_search_fields())
+
+    def get_list_filter_fields(self) -> list[str]:
+        return list(self.list_filter)
+
+    def get_sortable_fields(self) -> list[str]:
+        if self.sortable_fields:
+            return list(self.sortable_fields)
+        if self.list_display:
+            return [
+                field
+                for field in self.list_display
+                if field in self.table_columns or field in self.table_fk_columns
+            ]
+        return self.get_model_primary_keys()
+
+    def get_list_query(self, statement, *, request=None):
+        return statement
+
+    def before_create(self, request, values: dict[str, Any]) -> dict[str, Any]:
+        return values
+
+    def after_create(self, request, record) -> None:
+        return None
+
+    def before_update(self, request, record, values: dict[str, Any]) -> dict[str, Any]:
+        return values
+
+    def after_update(self, request, record) -> None:
+        return None
+
+    def has_module_permission(self, request) -> bool:
+        return True
+
+    def has_list_permission(self, request) -> bool:
+        return self.has_module_permission(request)
+
+    def has_view_permission(self, request, record=None) -> bool:
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request) -> bool:
+        return self.has_module_permission(request)
+
+    def has_edit_permission(self, request, record=None) -> bool:
+        return self.has_module_permission(request)
+
+    def has_delete_permission(self, request, record=None) -> bool:
+        return self.has_module_permission(request)
+
+    def has_action_permission(self, request, action_name: str) -> bool:
+        return self.has_module_permission(request)
+
+    def get_object_actions(self, request, record) -> list[dict[str, str]]:
+        return []
+
+    def get_bulk_actions(self, request=None) -> list[dict[str, str]]:
+        if request is not None and not self.has_delete_permission(request):
+            delete_actions: list[dict[str, str]] = []
+        else:
+            delete_actions = [{"name": "delete", "label": "Delete selected"}]
+        custom_actions = [
+            {"name": name, "label": label}
+            for name, label in self.actions.items()
+            if request is None or self.has_action_permission(request, name)
+        ]
+        return [*delete_actions, *custom_actions]
+
+    def run_action(
+        self, name: str, request, session: Session, records: list[Any]
+    ) -> str:
+        if name not in self.actions:
+            raise UnknownAdminActionError(
+                f"{self.get_label()}: unknown bulk action '{name}'"
+            )
+        if not self.has_action_permission(request, name):
+            raise UnknownAdminActionError(
+                f"{self.get_label()}: action '{name}' is not available"
+            )
+        handler = getattr(self, f"handle_action_{name}")
+        result = handler(request, session, records)
+        return (
+            result
+            or f"{self.get_plural_label()}: action '{self.actions[name]}' completed"
+        )
+
     def get_form(
         self,
         *,
-        operation: Optional[OperationKind] = OperationKind.VIEW,
+        operation: OperationKind = OperationKind.VIEW,
         record=None,
     ):
         return AdminForm(
@@ -289,7 +363,7 @@ class ModelAdmin:
         )
 
     def render_form(
-        self, operation: Optional[OperationKind] = OperationKind.VIEW, **kwargs
+        self, operation: OperationKind = OperationKind.VIEW, **kwargs
     ):
         record = kwargs.get("record")
         return self.get_form(record=record, operation=operation).render_form(**kwargs)
@@ -305,224 +379,133 @@ class ModelAdmin:
                 raise ValueError(
                     f"{self.__class__.__name__} Error: Invalid attribute :widgets: {name}'s widget is not valid"
                 )
+            if getattr(widget, "input_type", None) == "file":
+                raise ValueError(
+                    f"{self.__class__.__name__} Error: Invalid attribute :widgets: "
+                    f"{name} cannot use a file input because file uploads are not supported yet"
+                )
 
         return self.widgets
 
-    def get_model_primary_keys(self) -> Iterable[str]:
-        """This method is used to get model primary keys.
+    def get_formfield_override_widget(self, column: Column) -> Widget | None:
+        for column_type, widget_or_type in self.formfield_overrides.items():
+            if isinstance(column.type, column_type):
+                if isinstance(widget_or_type, Widget):
+                    return deepcopy(widget_or_type)
+                if isinstance(widget_or_type, type) and issubclass(
+                    widget_or_type, Widget
+                ):
+                    return widget_or_type()
+                raise ValueError(
+                    f"{self.__class__.__name__} Error: Invalid formfield override for {column.key}"
+                )
+        return None
 
-        :return: A str.
-        """
-        return [
-            column.key
-            for column in self.model.__table__.primary_key
-            if not column.foreign_keys
-        ]
+    def get_model_primary_keys(self) -> list[str]:
+        return get_model_primary_keys(self.model)
 
-    def get_auto_increment_column(self) -> Union[Column, None]:
+    def get_primary_key_name(self) -> str:
+        primary_keys = list(self.get_model_primary_keys())
+        return primary_keys[0]
+
+    def get_auto_increment_column(self) -> Column | None:
         return self.model.__table__.autoincrement_column
 
-    def get_fields_as_columns(self) -> List[Column]:
+    def get_fields_as_columns(self) -> list[Column | RelationshipProperty]:
         assert isinstance(self.get_model_admin_fields(), (list, tuple))
-        columns: List[Column] = []
-        # print(self.get_model_admin_fields())
-        # exclude = set(self.exclude + kwargs.get('exclude', []))
+        columns: list[Column | RelationshipProperty] = []
+        auto_increment_column = self.get_auto_increment_column()
         for field in self.get_model_admin_fields():
             if field not in self.exclude:
                 column = self.all_columns[field]
-                if (
-                    self.get_auto_increment_column() is not None
-                    and self.get_auto_increment_column().key == column.key
-                ):
+                if isinstance(column, RelationshipProperty):
+                    if column.secondary is not None:
+                        raise UnsupportedRelationshipError(
+                            f"{self.__class__.__name__} Error: {field} is unsupported because "
+                            "many-to-many relationships are not supported in admin forms yet"
+                        )
+                    if column.direction == RelationshipDirection.ONETOMANY:
+                        raise UnsupportedRelationshipError(
+                            f"{self.__class__.__name__} Error: {field} is unsupported because "
+                            "one-to-many collections are not supported as admin form fields"
+                        )
+                    columns.append(column)
+                    continue
+                if auto_increment_column is not None and auto_increment_column.key == column.key:
                     continue
                 columns.append(column)
         return columns
 
+    def get_record_label(self, record) -> str:
+        for field_name in (
+            "name",
+            "title",
+            "label",
+            "code",
+            self.get_primary_key_name(),
+        ):
+            if hasattr(record, field_name):
+                value = getattr(record, field_name)
+                if value not in (None, ""):
+                    return str(value)
+        return str(record)
 
-class AdminForm:
-    def __init__(
-        self,
-        modeladmin: ModelAdmin,
-        widgets: Dict[str, Widget],
-        engine: Engine,
-        record: Any,
-        operation: OperationKind,
-    ):
-        if not isinstance(modeladmin, ModelAdmin):
-            raise ValueError(f"{modeladmin} not an instance of {ModelAdmin.__name__}")
-        self.modeladmin: ModelAdmin = modeladmin
-        self.widgets = widgets
-        self.engine = engine
-        self.record = record
-        self.operation = operation
+    def get_list_display_value(self, record, field: str) -> Any:
+        if field in self.table_rel_columns:
+            related = getattr(record, field, None)
+            return "" if related is None else self.get_record_label(related)
 
-    def field_is_readonly(self, column_name: str, is_pk: bool):
-        return (
-            self.operation == OperationKind.VIEW
-            or column_name in self.modeladmin.readonly_fields
-            or (
-                self.operation != OperationKind.ADD
-                and is_pk
-                and self.record is not None
-            )  # if record is None then we are in the add view not  edit
-        )
-
-    @staticmethod
-    def _get_record_value(record, name):
-        try:
-            return getattr(record, name)
-        except AttributeError:
-            if isinstance(record, dict):
-                return record.get(name)
-
-    def get_columns_widget(self, columns: List[Column]) -> Dict[str, ColumnWidget]:
-        widget_map: Dict[str, ColumnWidget] = {}
-        primary_keys = self.modeladmin.get_model_primary_keys()
-        for column in columns:
-            column_name = column.key
-            is_pk = column_name in primary_keys
-
-            if isinstance(column, Column):
-                attrs = {
-                    **(
-                        {"value": self._get_record_value(self.record, column_name)}
-                        if self.record
-                        else {}
-                    ),
-                    "readonly": self.field_is_readonly(
-                        column_name=column_name, is_pk=is_pk
-                    ),
-                    "required": not column.nullable or column.default is not None,
-                }
-                if isinstance(column.type, String):
-                    widget = TextInput(attrs)
-                elif isinstance(column.type, (Integer, Float)):
-                    widget = NumberInput(attrs)
-                elif isinstance(column.type, Boolean):
-                    widget = CheckboxInput(attrs)
-                else:
-                    widget = TextInput(attrs)
-            elif isinstance(column, RelationshipProperty):
-                from .helpers import get_any_model_primary_keys, getattrs
-
-                field_type = column.direction
-                column_name = column.key
-                if column.secondary is not None:
+        value = getattr(record, field, None)
+        if field in self.table_fk_columns:
+            for rel_name, relationship in self.table_rel_columns.items():
+                if relationship.direction != RelationshipDirection.MANYTOONE:
                     continue
-                c_model_pk = get_any_model_primary_keys(column.mapper.class_)[0]
-
-                attrs = {
-                    **{
-                        **(
-                            {
-                                "value": str(
-                                    getattrs(
-                                        self._get_record_value(
-                                            self.record, column_name
-                                        ),
-                                        c_model_pk,
-                                        None,
-                                    )
-                                )
-                            }
-                            if self.record
-                            else {}
-                        ),
-                        "readonly": self.operation == OperationKind.VIEW,
-                    },
-                    **{},
+                local_column_names = {
+                    column.key for column in relationship.local_columns
                 }
-                if (
-                    field_type == RelationshipDirection.MANYTOONE
-                    or field_type == RelationshipDirection.MANYTOMANY
-                ):
-                    if (
-                        self.operation == OperationKind.VIEW
-                        or column_name in self.modeladmin.raw_id_fields
-                    ):
-                        widget = TextInput(attrs)
-                    else:
-                        with Session(self.engine) as session:
-                            queryset = (
-                                session.execute(select(column.mapper.class_))
-                                .scalars()
-                                .all()
-                            )
+                if field in local_column_names:
+                    related = getattr(record, rel_name, None)
+                    if related is not None:
+                        related_label = self.get_record_label(related)
+                        return f"{related_label} ({value})"
+        return value
 
-                            choices = [
-                                (getattrs(qs, c_model_pk, None), str(qs))
-                                for qs in queryset
-                            ]
-                            # print(choices)
-                            if field_type == RelationshipDirection.MANYTOMANY:
-                                widget = SelectMultiple(
-                                    choices=choices,
-                                    attrs=attrs,
-                                )
-                            else:
-                                widget = Select(
-                                    choices=choices,
-                                    attrs=attrs,
-                                )
-                elif field_type == RelationshipDirection.ONETOMANY:  # reverse lookups
-                    widget = None
+    def get_column_python_type(self, field: str):
+        column_type = self.all_columns[field].type
+        try:
+            return column_type.python_type
+        except (AttributeError, NotImplementedError):
+            return None
 
-            if widget:
-                widget_map[column.key] = ColumnWidget(widget=widget, column=column)
-
-        return widget_map
-
-    def get_render_widgets(self):
-        columns = self.modeladmin.get_fields_as_columns()
-        field_widgets = self.get_columns_widget(columns)
-
-        for name, widget in self.widgets.items():
-            if name not in self.fields:
-                raise ValueError(
-                    f"{self.__class__.__name__} Error: Invalid attribute :widgets: {name} not in fields"
-                )
-
-            if not isinstance(widget, Widget):
-                raise ValueError(
-                    f"{self.__class__.__name__} Error: Invalid attribute :widgets: {name}'s widget is not valid"
-                )
-
-            if name in field_widgets.keys():
-                field_widgets[name].widget = widget
-
-        return field_widgets
-
-    def render_form(self, **kwargs):
-        exclude = kwargs.get("exclude", [])
-        return templates.get_template("form/div.html").render(
-            {
-                "fields": {
-                    name: {
-                        "label": column_widget.widget.render_label(
-                            name=name, value=None
-                        ),
-                        "field": column_widget.widget.render(
-                            name=name, value=column_widget.widget.attrs.get("value")
-                        ),
-                        "error": name in kwargs.get("error_fields", []),
-                    }
-                    for name, column_widget in self.get_render_widgets().items()
-                    if name not in exclude
+    def get_list_filter_options(self, session: Session) -> list[dict[str, Any]]:
+        filter_options: list[dict[str, Any]] = []
+        for field in self.get_list_filter_fields():
+            getattr(self.model, field)
+            property_column = self.all_columns[field]
+            options: list[dict[str, str]] = []
+            if self.get_column_python_type(field) is bool:
+                options = [
+                    {"value": "true", "label": "Yes"},
+                    {"value": "false", "label": "No"},
+                ]
+            else:
+                values = [
+                    value
+                    for value in session.execute(
+                        self._query_builder.get_distinct_values_stmt(field)
+                    )
+                    .scalars()
+                    .all()
+                    if value not in (None, "")
+                ]
+                options = [
+                    {"value": str(value), "label": str(value)} for value in values
+                ]
+            filter_options.append(
+                {
+                    "name": field,
+                    "label": self.get_field_label(field),
+                    "options": options,
                 }
-            }
-        )
-
-    def validate_form(self, **kwargs):
-        exclude = kwargs.get("exclude", [])
-        form_body = kwargs.get("form_body", {})
-        response = {}
-        for name, column_widget in self.get_render_widgets().items():
-            if name not in exclude:
-                _destination_col = name
-                column = column_widget.column
-                if isinstance(column, RelationshipProperty):
-                    _destination_col = next(iter(column.local_columns)).key
-                response[_destination_col] = column_widget.widget.format_value(
-                    form_body.get(name)
-                )
-        return response
+            )
+        return filter_options

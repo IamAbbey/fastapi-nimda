@@ -1,16 +1,23 @@
-from pydantic import BaseModel, InstanceOf
-from sqlalchemy.orm.decl_api import DeclarativeAttributeIntercept
-from typing import Type
+from __future__ import annotations
 
-from .admin import ModelAdmin
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm.decl_api import DeclarativeAttributeIntercept
+
+    from .admin import ModelAdmin
 
 
-class RegisteredResource(BaseModel):
-    model: InstanceOf[DeclarativeAttributeIntercept]
-    modeladmin: Type[ModelAdmin]  # type: ModelAdmin
+@dataclass
+class RegisteredResource:
+    identity: str
+    model: type["DeclarativeAttributeIntercept"]
+    modeladmin: type["ModelAdmin"]
 
 
-class AdminSite(BaseModel):
+@dataclass
+class AdminSite:
     index_title: str = ""
     site_header: str = ""
     site_title: str = ""

@@ -9,38 +9,42 @@
     
 
 {% block content %}
-<div class="flex flex-col gap-4">
-    <p class="text-2xl">Delete record </p>
-    
-    <p class="mt-4">Are you sure you want to the delete 
-        
-        {% if records|length >= 2 %}
-        the selected {{records|length}} {{table_name}} records?
-        {% else %}
-        {{table_name}} <span class="italic">"{{records[0]}}"?
-        {% endif %}
-    All of the <br> following related items will be deleted: </p>
-    
-    <p class="font-bold">Summary:</p>
-            {% for record in records %}
-            {{record.countries}}
-            {% endfor %}
-    <p class="font-bold">Objects:</p>
-    <ul class="list-disc list-inside pl-4">
-        
-        {% for record in records %}
-            <li>{{table_name}}: <a class="text-blue-700 dark:text-blue-400" href="{{ url_for('admin_view', identity=identity, key=record|attr(pk)) }}">{{record}}</a></li>
-        {% endfor %}
-            
-    </ul>
-
-    <div class="flex justify-start gap-3 mt-4">
-        <button type="submit" class="px-8 py-2.5 text-sm font-medium text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:outline-none focus:ring-red-300 rounded-lg text-center dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-800">Yes, I'm sure</button>
-        <button type="submit" class="px-8 py-2.5 text-sm font-medium text-white bg-gray-700 hover:bg-gray-800 focus:ring-4 focus:outline-none focus:ring-gray-300 rounded-lg text-center dark:bg-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-800">No, take me back</button>
+<div class="flex flex-col gap-6">
+    <div>
+        <p class="text-2xl font-semibold">Delete record</p>
+        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Confirm removal before this change is applied.
+        </p>
     </div>
+
+    <form method="post" class="flex flex-col gap-5 rounded-xl border border-red-200 bg-white p-5 shadow-sm dark:border-red-900/60 dark:bg-gray-800">
+        <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">
+            {% if records|length >= 2 %}
+            You are about to delete {{ records|length }} {{ table_name }} records.
+            {% else %}
+            You are about to delete {{ table_name }} <span class="italic">"{{ records[0] }}"</span>.
+            {% endif %}
+            This action cannot be undone.
+        </div>
+
+        <div class="space-y-3">
+            <p class="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Objects</p>
+            <ul class="space-y-2">
+                {% for record in records %}
+                <li class="rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ table_name }}:</span>
+                    <a class="ml-2 text-blue-700 dark:text-blue-400" href="{{ url_for('admin_view', identity=identity, key=record|attr(pk)) }}">{{ record|attr(pk) }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="flex flex-wrap justify-start gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <button type="submit" class="rounded-lg bg-red-700 px-8 py-2.5 text-sm font-medium text-white hover:bg-red-800 focus:outline-none focus:ring-4 focus:ring-red-300 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-800">Yes, I'm sure</button>
+            <a href="{{ url_for('admin_list', identity=identity) }}" class="rounded-lg bg-gray-200 px-8 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-800">No, take me back</a>
+        </div>
+    </form>
 </div>
-
-
 {% endblock content %}
 
 {% block extraJS %}

@@ -16,8 +16,8 @@ The current implementation already has a usable core:
 
 At the same time, the repository still reads like a work in progress rather than a finished package:
 
-- the README is only a short usage sketch and does not document the system
-- there are multiple scratch/example files (`main.py`, `main2.py`, `test.py`, `admin copy.py`, template copies)
+- the README now defines the package boundary, but broader end-user docs are still incomplete
+- examples and scratch artifacts have been separated into `examples/`, `docs/`, and `archive/`, but the codebase still has prototype-era assumptions
 - there is little visible automated test coverage
 - several constraints are hard-coded into the implementation
 - some APIs and naming are still unstable or incomplete
@@ -121,7 +121,7 @@ Responsibilities:
 - instantiate `ModelAdmin` objects on demand
 - validate that model/admin combinations are acceptable
 
-The registration model is intentionally simple: an identity string maps to a model plus its admin class.
+The registration model is intentionally simple: a stable resource slug maps to a model plus its admin class.
 
 ### Admin Configuration and Query Layer
 
@@ -166,7 +166,7 @@ File: `fastapi_nimda/depends.py`
 
 Responsibilities:
 
-- resolve a registered resource from the URL identity
+- resolve a registered resource from the URL slug/identity
 - create the correct `ModelAdmin` instance for that resource
 - fetch a single record or multiple records
 - expose these objects to route handlers through FastAPI dependency injection
@@ -198,8 +198,10 @@ The current implementation assumes a fairly narrow ORM model:
 - SQLAlchemy or SQLModel-backed models
 - a conventional primary key access pattern
 - limited foreign-key complexity
-- no file upload handling yet
+- file uploads are explicitly rejected
+- multi-column primary keys are explicitly rejected
 - no many-to-many admin workflow support beyond partial relationship awareness
+- one-to-many collection fields are explicitly rejected in admin forms
 
 There is also an explicit SQLite version requirement because inserts rely on `RETURNING`.
 
@@ -218,7 +220,7 @@ Its strengths are:
 Its current weaknesses are:
 
 - responsibilities are concentrated heavily inside `ModelAdmin`
-- the model registry uses generated string identities instead of stable names
+- route identity is now deterministic, but still coupled to registry naming rules
 - there is little separation between query generation, form generation, and view behavior
 - error handling is still ad hoc
 - feature support is constrained by assumptions embedded deep in inspection logic

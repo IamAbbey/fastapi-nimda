@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Any
+
 from .templating.templating import templates
 import copy
 
@@ -5,8 +9,10 @@ import copy
 class Widget:
     is_required = False
     label_template_name = "form/widgets/label.html"
+    input_type: str | None = None
+    template_name: str = ""
 
-    def __init__(self, attrs=None):
+    def __init__(self, attrs: dict[str, Any] | None = None):
         self.attrs = {} if attrs is None else attrs.copy()
 
     @property
@@ -56,11 +62,11 @@ class Input(Widget):
     Base class for all <input> widgets.
     """
 
-    input_type = None  # Subclasses must define this.
+    input_type: str | None = None  # Subclasses must define this.
     template_name = "form/widgets/input.html"
     css_style = "block w-full p-2 text-gray-900 border border-gray-300 rounded-lg bg-gray-50 text-base focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
 
-    def __init__(self, attrs={}):
+    def __init__(self, attrs: dict[str, Any] | None = None):
         if attrs is not None:
             attrs = attrs.copy()
             self.input_type = attrs.pop("type", self.input_type)
@@ -130,15 +136,19 @@ class CheckboxInput(Input):
 
 class ChoiceWidget(Widget):
     allow_multiple_selected = False
-    input_type = None
-    template_name = None
-    option_template_name = None
+    input_type: str | None = None
+    template_name: str = ""
+    option_template_name: str | None = None
     add_id_index = True
     checked_attribute = {"checked": True}
     option_inherits_attrs = True
     css_style = "w-full text-base text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
 
-    def __init__(self, attrs={}, choices=()):
+    def __init__(
+        self,
+        attrs: dict[str, Any] | None = None,
+        choices: tuple[Any, ...] | list[Any] = (),
+    ):
         if attrs is not None:
             attrs = attrs.copy()
             attrs["class"] = attrs.get("class", self.css_style)
@@ -258,6 +268,13 @@ class Select(ChoiceWidget):
         if self.allow_multiple_selected:
             context["widget"]["attrs"]["multiple"] = True
         return context
+
+    def format_value(self, value):
+        if value is None:
+            return []
+        if isinstance(value, (tuple, list)):
+            return [str(v) if v is not None else "" for v in value]
+        return [str(value)]
 
     @staticmethod
     def _choice_has_empty_value(choice):

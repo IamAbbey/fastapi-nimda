@@ -1,13 +1,13 @@
-from typing import List, Optional, Dict
-from fastapi import Depends, Request
-from fastapi.params import Path
 from dataclasses import dataclass
+
+from fastapi import Depends, Query, Request
+from fastapi.params import Path
 from fastapi_nimda.admin import ModelAdmin
-from .types import RegisteredResource
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
-from fastapi import Query
+from .registry import build_model_admin
+from .types import RegisteredResource
 
 
 @dataclass
@@ -17,14 +17,14 @@ class ResourceDependency:
 
 
 def get_model_admin(resource, engine: Engine) -> ModelAdmin:
-    return resource.modeladmin(model=resource.model, engine=engine)
+    return build_model_admin(resource, engine)
 
 
 def get_resource(
-    request: Request, identity: Optional[str] = Path(...)
-) -> ResourceDependency:
+    request: Request, identity: str | None = Path(...)
+) -> ResourceDependency | None:
     if identity is None:
-        return
+        return None
 
     _resource: RegisteredResource = request.app.register_resource[identity]
     return ResourceDependency(
@@ -35,10 +35,10 @@ def get_resource(
 def get_record(
     request: Request,
     resource: ResourceDependency = Depends(get_resource),
-    key: Optional[str] = Path(...),
-) -> ResourceDependency:
-    if resource is None:
-        return
+    key: str | None = Path(...),
+) -> ResourceDependency | None:
+    if resource is None or key is None:
+        return None
 
     with Session(request.app.engine) as session:
         return session.execute(
@@ -50,9 +50,9 @@ def get_records(
     request: Request,
     keys: str = Query(),
     resource: ResourceDependency = Depends(get_resource),
-) -> ResourceDependency:
+) -> ResourceDependency | None:
     if resource is None:
-        return
+        return None
 
     with Session(request.app.engine) as session:
         return (
@@ -64,8 +64,8 @@ def get_records(
         )
 
 
-def get_resources(request: Request) -> List[ResourceDependency]:
-    _resources: Dict[str, RegisteredResource] = request.app.register_resource
+def get_resources(request: Request) -> list[ResourceDependency]:
+    _resources: dict[str, RegisteredResource] = request.app.register_resource
     return [
         ResourceDependency(
             identity=identity, modeladmin=get_model_admin(resource, request.app.engine)
