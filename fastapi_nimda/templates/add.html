@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+
+{% block breadcrumb %}
+{% with paths=[(url_for('admin_list', identity=identity), table_name), ('', 'Add')] %}
+{% include "/component/breadcrumb.html" %}
+{% endwith %}
+{% endblock breadcrumb %}
+    
+
+{% block content %}
+<div class="flex flex-col gap-4">
+    <p class="text-2xl">Add {{ table_name }}</p>
+    <form action="{{ url_for('admin_add_post', identity=identity) }}" method="post">
+    {{ form|safe }}
+    
+    <div class="flex justify-end">
+        <button type="submit" class="px-8 py-2.5 text-sm font-medium text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 rounded-lg text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800 uppercase">Save</button>
+    </div>
+    </form>
+</div>
+
+
+{% endblock content %}
+
+{% block extraJS %}
+<script>
+    $(document).ready(function() {
+        $('select').select2();
+    });
+</script>
+{% endblock extraJS %}

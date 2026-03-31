@@ -1,0 +1,10 @@
+<div class="flex flex-col gap-2 p-2 mt-4">
+    {% for name, _field in fields.items() %}
+        <div class="border-b border-gray-200 dark:border-gray-600">
+            <div class="flex flex-wrap pb-4 pt-2 items-center max-w-3xl">
+                <div class="w-40 {% if _field.error %} error_class {% endif %}">{{ _field.label|safe }}</div>
+                <div class="grow {% if _field.error %} error_class {% endif %}">{{ _field.field|safe }}</div>
+            </div>
+        </div>
+    {% endfor %}
+</div>

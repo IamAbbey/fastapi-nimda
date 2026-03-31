@@ -1,0 +1,8 @@
+<select name="{{ widget.name }}"{% with attrs=widget.attrs %}{% include "/form/widgets/attrs.html" %}{% endwith %}>
+  {% for option in widget.options %}
+    {% with widget=option %}
+    {% include option.template_name %}
+    {% endwith %}
+    {% endfor %}
+  </select>
+  

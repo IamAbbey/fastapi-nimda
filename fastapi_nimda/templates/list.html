@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+{% with paths=[('', table_name), ('', 'List')] %}
+{% include "/component/breadcrumb.html" %}
+{% endwith %}
+{% endblock breadcrumb %}
+
+{% block content %}
+
+<div class="flex flex-wrap items-center justify-between my-3">
+    <p class="tex-xl">Select {{ table_name }} to change</p>
+    {% if can_perform_add %}
+    <a href="{{ url_for('admin_add', identity=identity) }}"
+        class="flex items-center gap-1 uppercase px-5 py-2 me-2 mb-2 text-xs font-medium text-gray-900 focus:outline-none bg-gray-200 rounded-full border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100 dark:focus:ring-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:text-white dark:hover:bg-gray-700">
+        Add {{ table_name|pretty_name }} {% include "/component/plus_svg.html" %}
+    </a>
+    {% endif %}
+</div>
+
+<div class="relative overflow-x-auto sm:rounded-lg">
+    <div class="flex flex-wrap items-center justify-between gap-4 pb-4 bg-white dark:bg-gray-900">
+        <div class="flex items-center gap-2">
+            <select id="action-select"
+                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 block w-60  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                <option value="">-------</option>
+                <option value="delete">Delete</option>
+                <option value="seed">Generate dummy value</option>
+                <option>France</option>
+                <option>Germany</option>
+            </select>
+            <button id="action-btn" type="button"
+                class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm p-2.5 text-center inline-flex items-center me-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 14 10">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M1 5h12m0 0L9 1m4 4L9 9" />
+                </svg>
+                <span class="sr-only">Icon description</span>
+            </button>
+        </div>
+
+
+        <div>
+            <label for="table-search" class="sr-only">Search</label>
+            <div class="relative">
+                <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" />
+                    </svg>
+                </div>
+                <input type="text" id="table-search"
+                    class="block pt-2 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg w-80 bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                    placeholder="Search for items">
+            </div>
+        </div>
+
+
+
+    </div>
+
+    {% with columns=list_display, data=data, identity=identity, tablename=table_name, pk=pk %}
+    {% include "/component/table.html" %}
+    {% endwith %}
+
+</div>
+
+{% if data %}
+{% with count=count, pagination=pagination %}
+{% include "/component/pagination.html" %}
+{% endwith %}
+{% endif %}
+
+
+{% endblock content %}
+
+{% block extraJS %}
+<script>
+    $(document).ready(function () {
+        const deleteURL = "{{ url_for('admin_delete', identity=identity) }}"
+        
+        $('#action-btn').on('click', function () {
+            const action = $("#action-select").val();
+            if (action == null || action == "") {
+                return;
+            }
+            const recordIds = [];
+            $('input[type="checkbox"][data-record-id]').each(function (index, element) {
+                const isChecked = $(this, element).is(':checked');
+                if (isChecked) {
+                    const recordId = $(this, element).data("record-id")
+                    console.log(recordId);
+                    recordIds.push(recordId);
+                }
+            });
+
+            if (recordIds && action == "delete") {
+                const delete_get_url = deleteURL + "?keys=" + recordIds.join(",");
+                window.location = delete_get_url;
+            }
+
+        });
+    });
+</script>
+{% endblock extraJS %}

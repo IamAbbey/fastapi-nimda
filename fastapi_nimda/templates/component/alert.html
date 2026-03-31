@@ -1,0 +1,17 @@
+
+{% for _message in messages %}
+
+{% with message=_message.message %}
+    
+    {% if _message.kind == 'error' %}
+      {% include "/component/alert/error.html" %}
+    {% elif _message.kind == 'success' %}
+      {% include "/component/alert/success.html" %}
+    {% else %}
+      {% include "/component/alert/info.html" %}
+    {% endif %}
+      
+{% endwith %}
+    
+{% endfor %}
+    
