@@ -5,7 +5,7 @@ start-sqlalchemy:
     uv run fastapi dev examples/sqlalchemy_demo/main.py
 
 watch-css:
-    npx @tailwindcss/cli -i ./fastapi_nimda/static/src/input.css -o ./fastapi_nimda/static/dist/output.css --watch
+    npx @tailwindcss/cli -i ./fastapi_nimda/static/src/input.css -o ./fastapi_nimda/static/lib/output.css --watch
 
 lint:
     uvx mypy .

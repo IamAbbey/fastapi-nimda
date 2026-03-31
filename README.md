@@ -138,7 +138,7 @@ Useful local commands currently present in the repository:
 ```bash
 uv run fastapi dev examples/sqlmodel_demo/main.py
 uv run fastapi dev examples/sqlalchemy_demo/main.py
-npx @tailwindcss/cli -i ./fastapi_nimda/static/src/input.css -o ./fastapi_nimda/static/dist/output.css --watch
+npx @tailwindcss/cli -i ./fastapi_nimda/static/src/input.css -o ./fastapi_nimda/static/lib/output.css --watch
 ```
 
 These are development-time commands for the current repository layout and may change as the project is restructured.
