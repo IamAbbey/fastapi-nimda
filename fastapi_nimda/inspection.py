@@ -19,6 +19,7 @@ class ModelInspection:
     primary_key_columns: list[Column]
     supported_form_fields: list[str]
     unsupported_relation_fields: dict[str, str]
+    readonly_relation_fields: dict[str, str]
 
     @property
     def all_columns(self):
@@ -35,6 +36,7 @@ def inspect_model(model: type[DeclarativeBase]) -> ModelInspection:
     table_fk_columns: dict[str, Column] = {}
     table_rel_columns: dict[str, RelationshipProperty] = {}
     unsupported_relation_fields: dict[str, str] = {}
+    readonly_relation_fields: dict[str, str] = {}
     primary_key_columns = list(model.__table__.primary_key.columns)
     supported_form_fields: list[str] = []
 
@@ -79,9 +81,14 @@ def inspect_model(model: type[DeclarativeBase]) -> ModelInspection:
                 "many-to-many relationships are not supported in admin forms yet"
             )
             continue
-        if column.direction == RelationshipDirection.ONETOMANY:
+        if column.uselist:
             unsupported_relation_fields[column.key] = (
                 "one-to-many collections are not supported as admin form fields"
+            )
+            continue
+        if column.direction == RelationshipDirection.ONETOMANY:
+            readonly_relation_fields[column.key] = (
+                "reverse one-to-one relationships are read-only and cannot be used as admin form fields"
             )
             continue
         supported_form_fields.append(column.key)
@@ -93,6 +100,7 @@ def inspect_model(model: type[DeclarativeBase]) -> ModelInspection:
         primary_key_columns=primary_key_columns,
         supported_form_fields=supported_form_fields,
         unsupported_relation_fields=unsupported_relation_fields,
+        readonly_relation_fields=readonly_relation_fields,
     )
 
 

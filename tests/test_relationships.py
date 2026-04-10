@@ -7,7 +7,7 @@ import sys
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import Column, ForeignKey, String, Table
+from sqlalchemy import Column, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlmodel import Field, SQLModel, create_engine
@@ -15,6 +15,7 @@ from sqlmodel import Field, SQLModel, create_engine
 from fastapi_nimda import FastAPINimda
 from fastapi_nimda.admin import ModelAdmin
 from fastapi_nimda.errors import UnsupportedRelationshipError
+from fastapi_nimda.inspection import inspect_model
 
 from .conftest import Base
 
@@ -79,6 +80,73 @@ def test_one_to_many_field_is_explicitly_rejected(sa_engine):
         match="one-to-many collections are not supported as admin form fields",
     ):
         ParentAdmin(model=Parent, engine=sa_engine)
+
+
+def test_scalar_reverse_one_to_one_is_allowed_in_list_display_but_not_form_fields(
+    tmp_path,
+):
+    class SourceInput(Base):
+        __tablename__ = "source_inputs"
+
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+        source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+        file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+        task_status: Mapped["SourceInputTaskStatus | None"] = relationship(
+            back_populates="source_input",
+            uselist=False,
+        )
+
+    class SourceInputTaskStatus(Base):
+        __tablename__ = "source_input_task_statuses"
+
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+        status: Mapped[str] = mapped_column(String(50), default="pending")
+        source_input_id: Mapped[int] = mapped_column(
+            ForeignKey("source_inputs.id"), unique=True
+        )
+        source_input: Mapped[SourceInput] = relationship(back_populates="task_status")
+
+    class SourceInputAdmin(ModelAdmin):
+        list_display = ["id", "source_url", "task_status"]
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'scalar-one-to-one.db'}")
+    Base.metadata.create_all(engine)
+
+    inspection = inspect_model(SourceInput)
+    assert "task_status" not in inspection.supported_form_fields
+    assert "task_status" in inspection.readonly_relation_fields
+
+    modeladmin = SourceInputAdmin(model=SourceInput, engine=engine)
+    assert "task_status" not in modeladmin.get_model_admin_fields()
+
+    with Session(engine) as session:
+        source_input = SourceInput(
+            source_url="https://example.com/song",
+            file_path="/tmp/song.txt",
+        )
+        session.add(source_input)
+        session.commit()
+        session.refresh(source_input)
+        session.add(
+            SourceInputTaskStatus(
+                status="ready",
+                source_input_id=source_input.id,
+            )
+        )
+        session.commit()
+
+    app = FastAPI()
+    admin = FastAPINimda(app=app, engine=engine)
+    identity = admin.register(SourceInput, SourceInputAdmin)
+
+    with TestClient(app) as client:
+        list_response = client.get(f"/admin/{identity}/list/")
+        view_response = client.get(f"/admin/{identity}/view/1")
+
+    assert list_response.status_code == 200
+    assert "ready" in list_response.text
+    assert view_response.status_code == 200
+    assert "https://example.com/song" in view_response.text
 
 
 def test_file_upload_request_is_rejected_with_clear_message(sa_client):

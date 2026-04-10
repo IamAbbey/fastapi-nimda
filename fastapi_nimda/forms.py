@@ -112,6 +112,16 @@ class AdminForm:
                         f"{self.modeladmin.__class__.__name__} Error: {column_name} is unsupported because "
                         "many-to-many relationships are not supported in admin forms yet"
                     )
+                if column.uselist:
+                    raise UnsupportedRelationshipError(
+                        f"{self.modeladmin.__class__.__name__} Error: {column_name} is unsupported because "
+                        "one-to-many collections are not supported as admin form fields"
+                    )
+                if column.direction == RelationshipDirection.ONETOMANY:
+                    raise UnsupportedRelationshipError(
+                        f"{self.modeladmin.__class__.__name__} Error: {column_name} is unsupported because "
+                        "reverse one-to-one relationships are read-only and cannot be used as admin form fields"
+                    )
                 c_model_pk = get_any_model_primary_keys(column.mapper.class_)[0]
 
                 attrs = {
@@ -154,12 +164,6 @@ class AdminForm:
                             widget = SelectMultiple(choices=choices, attrs=attrs)
                         else:
                             widget = Select(choices=choices, attrs=attrs)
-                elif field_type == RelationshipDirection.ONETOMANY:
-                    raise UnsupportedRelationshipError(
-                        f"{self.modeladmin.__class__.__name__} Error: {column_name} is unsupported because "
-                        "one-to-many collections are not supported as admin form fields"
-                    )
-
             if widget:
                 widget_map[column.key] = ColumnWidget(widget=widget, column=column)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import delete, distinct, insert, or_, select, tuple_, update
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import func
@@ -17,7 +19,7 @@ class ModelQueryBuilder:
         primary_key_fields = self.modeladmin.get_model_primary_keys()
         return [getattr(self.model, field) for field in primary_key_fields]
 
-    def _primary_key_predicate(self, values: list[object]):
+    def _primary_key_predicate(self, values: Sequence[object]):
         primary_key_columns = self.get_primary_key_as_model_column()
         if len(primary_key_columns) == 1:
             return primary_key_columns[0] == values[0]

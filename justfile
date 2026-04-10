@@ -8,9 +8,9 @@ watch-css:
     npx @tailwindcss/cli -i ./fastapi_nimda/static/src/input.css -o ./fastapi_nimda/static/lib/output.css --watch
 
 lint:
-    uvx mypy .
-    uvx ruff check .
-    uvx ruff format . --check
+    env UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools uvx mypy fastapi_nimda
+    env UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools uvx ruff check .
+    env UV_CACHE_DIR=.uv-cache UV_TOOL_DIR=.uv-tools uvx ruff format . --check
 
 test:
     uv run pytest

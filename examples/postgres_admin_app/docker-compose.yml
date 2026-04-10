@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: nimda
+      POSTGRES_USER: nimda
+      POSTGRES_PASSWORD: nimda
+    ports:
+      - "54329:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nimda -d nimda"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: ../..
+      dockerfile: repro/postgres_admin_app/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://nimda:nimda@db:5432/nimda
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8008:8000"

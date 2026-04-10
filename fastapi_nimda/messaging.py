@@ -2,6 +2,8 @@ from fastapi import Request
 from typing import Any, Literal
 from pydantic import BaseModel
 
+from .errors import FastAPINimdaError
+
 
 class TemplateMessage(BaseModel):
     kind: Literal["info", "success", "error"] = "info"
@@ -33,8 +35,20 @@ def add_template_models_context(request: Request) -> dict[str, Any]:
 
     registered: dict[str, Any] = getattr(request.app, "register_resource", {})
     resources = []
+    broken_resources = []
     for identity, value in registered.items():
-        modeladmin = build_model_admin(value, request.app.engine)
+        try:
+            modeladmin = build_model_admin(value, request.app.engine)
+        except FastAPINimdaError as exc:
+            broken_resources.append(
+                {
+                    "identity": identity,
+                    "table_name": value.model.__name__,
+                    "admin_class": value.modeladmin.__name__,
+                    "error": str(exc),
+                }
+            )
+            continue
         if not modeladmin.has_module_permission(request):
             continue
         resources.append(
@@ -51,6 +65,7 @@ def add_template_models_context(request: Request) -> dict[str, Any]:
     site = getattr(request.app, "site", None)
     return {
         "resources": resources,
+        "broken_resources": broken_resources,
         "site_header": getattr(site, "site_header", "") or "fastapi-nimda",
         "site_title": getattr(site, "site_title", "") or "Admin",
         "index_title": getattr(site, "index_title", "") or "Site administration",

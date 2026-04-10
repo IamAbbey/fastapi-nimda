@@ -51,6 +51,7 @@ class ModelAdmin:
         self._table_rel_columns = inspection.table_rel_columns
         self._supported_form_fields = inspection.supported_form_fields
         self._unsupported_relation_fields = inspection.unsupported_relation_fields
+        self._readonly_relation_fields = inspection.readonly_relation_fields
         self._query_builder = ModelQueryBuilder(self)
         self._validate_attributes()
 
@@ -115,6 +116,10 @@ class ModelAdmin:
     @property
     def unsupported_relation_fields(self):
         return self._unsupported_relation_fields
+
+    @property
+    def readonly_relation_fields(self):
+        return self._readonly_relation_fields
 
     def validate_fields_exist(self, fields: list[str], against):
         for field in fields:
@@ -196,17 +201,19 @@ class ModelAdmin:
             )
 
     def validate_supported_field_usage(self):
-        for attr in (
-            "fields",
-            "readonly_fields",
-            "raw_id_fields",
-            "list_display",
-        ):
+        for attr in ("fields", "readonly_fields", "raw_id_fields", "list_display"):
             for field in getattr(self, attr):
                 if field in self.unsupported_relation_fields:
                     raise UnsupportedRelationshipError(
                         f"{self.__class__.__name__} Error: Invalid attribute :{attr}: "
                         f"{field} is unsupported because {self.unsupported_relation_fields[field]}"
+                    )
+        for attr in ("fields", "raw_id_fields"):
+            for field in getattr(self, attr):
+                if field in self.readonly_relation_fields:
+                    raise UnsupportedRelationshipError(
+                        f"{self.__class__.__name__} Error: Invalid attribute :{attr}: "
+                        f"{field} is unsupported because {self.readonly_relation_fields[field]}"
                     )
 
     def validate_actions(self):
@@ -362,9 +369,7 @@ class ModelAdmin:
             operation=operation,
         )
 
-    def render_form(
-        self, operation: OperationKind = OperationKind.VIEW, **kwargs
-    ):
+    def render_form(self, operation: OperationKind = OperationKind.VIEW, **kwargs):
         record = kwargs.get("record")
         return self.get_form(record=record, operation=operation).render_form(**kwargs)
 
@@ -424,14 +429,22 @@ class ModelAdmin:
                             f"{self.__class__.__name__} Error: {field} is unsupported because "
                             "many-to-many relationships are not supported in admin forms yet"
                         )
-                    if column.direction == RelationshipDirection.ONETOMANY:
+                    if column.uselist:
                         raise UnsupportedRelationshipError(
                             f"{self.__class__.__name__} Error: {field} is unsupported because "
                             "one-to-many collections are not supported as admin form fields"
                         )
+                    if column.direction == RelationshipDirection.ONETOMANY:
+                        raise UnsupportedRelationshipError(
+                            f"{self.__class__.__name__} Error: {field} is unsupported because "
+                            "reverse one-to-one relationships are read-only and cannot be used as admin form fields"
+                        )
                     columns.append(column)
                     continue
-                if auto_increment_column is not None and auto_increment_column.key == column.key:
+                if (
+                    auto_increment_column is not None
+                    and auto_increment_column.key == column.key
+                ):
                     continue
                 columns.append(column)
         return columns
@@ -502,7 +515,6 @@ class ModelAdmin:
         filter_options: list[dict[str, Any]] = []
         for field in self.get_list_filter_fields():
             getattr(self.model, field)
-            property_column = self.all_columns[field]
             options: list[dict[str, str]] = []
             if self.get_column_python_type(field) is bool:
                 options = [

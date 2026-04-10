@@ -235,7 +235,9 @@ async def action_post(
     )
     with Session(request.app.engine) as session:
         records = (
-            session.execute(modeladmin.get_multi_record_query_stmt(keys=normalized_keys))
+            session.execute(
+                modeladmin.get_multi_record_query_stmt(keys=normalized_keys)
+            )
             .scalars()
             .all()
         )
