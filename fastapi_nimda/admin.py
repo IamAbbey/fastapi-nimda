@@ -477,6 +477,27 @@ class ModelAdmin:
         except (AttributeError, NotImplementedError):
             return None
 
+    def normalize_field_value(self, field: str, value: Any) -> Any:
+        if value in ("", None):
+            return None
+        if isinstance(value, list):
+            return [self.normalize_field_value(field, item) for item in value]
+
+        python_type = self.get_column_python_type(field)
+        if python_type is None or isinstance(value, python_type):
+            return value
+        if python_type is bool:
+            if isinstance(value, str):
+                return value.lower() == "true"
+            return bool(value)
+        return python_type(value)
+
+    def normalize_primary_key_value(self, value: Any) -> Any:
+        return self.normalize_field_value(self.get_primary_key_name(), value)
+
+    def normalize_primary_key_values(self, values: list[Any]) -> list[Any]:
+        return [self.normalize_primary_key_value(value) for value in values]
+
     def get_list_filter_options(self, session: Session) -> list[dict[str, Any]]:
         filter_options: list[dict[str, Any]] = []
         for field in self.get_list_filter_fields():

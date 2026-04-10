@@ -9,7 +9,7 @@ from fastapi_nimda.errors import UnsupportedPrimaryKeyError
 from fastapi_nimda.registry import build_model_admin
 from fastapi_nimda.types import RegisteredResource
 
-from .conftest import Base, Hero
+from .conftest import Base, Hero, HeroAdmin
 
 
 def test_duplicate_slug_is_rejected(sa_engine):
@@ -65,3 +65,9 @@ def test_build_model_admin_sets_registered_identity(sa_engine):
     modeladmin = build_model_admin(resource, sa_engine)
 
     assert modeladmin.get_absolute_url() == "/heroes-custom/list/"
+
+
+def test_model_admin_normalizes_integer_primary_keys(sa_engine):
+    modeladmin = HeroAdmin(model=Hero, engine=sa_engine)
+
+    assert modeladmin.normalize_primary_key_value("1") == 1

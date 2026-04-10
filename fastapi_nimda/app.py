@@ -15,7 +15,10 @@ from .templating.templating import templates
 from fastapi.staticfiles import StaticFiles
 
 
-def app_requirement_checks():
+def app_requirement_checks(engine: Engine):
+    if engine.dialect.name != "sqlite":
+        return
+
     import sqlite3
     import sys
 
@@ -34,7 +37,7 @@ class FastAPINimda(FastAPI):
     def __init__(self, *, app: ASGIApp, engine: Engine, site: AdminSite | None = None):
         super().__init__()
 
-        app_requirement_checks()
+        app_requirement_checks(engine)
 
         self.registry = AdminRegistry()
         self.models: list[object] = []

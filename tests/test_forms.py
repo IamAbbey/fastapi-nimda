@@ -39,6 +39,28 @@ def test_form_validation_maps_relationship_value_to_foreign_key(sa_engine):
     assert validated["code"] == "fr"
 
 
+def test_form_validation_coerces_integer_fields(sqlmodel_engine):
+    from .conftest import TeamHero, TeamHeroAdmin
+
+    modeladmin = TeamHeroAdmin(model=TeamHero, engine=sqlmodel_engine)
+    form = AdminForm(
+        modeladmin=modeladmin,
+        widgets=modeladmin.get_widgets(),
+        engine=sqlmodel_engine,
+        record=None,
+        operation=OperationKind.ADD,
+    )
+
+    validated = form.validate_form(
+        form_body={
+            "name": "Superman",
+            "team_id": "1",
+        }
+    )
+
+    assert validated["team_id"] == 1
+
+
 def test_custom_widget_override_is_applied(sa_engine):
     class OverrideHeroAdmin(HeroAdmin):
         widgets = {"name": TextInput(attrs={"class": "custom-name-input"})}

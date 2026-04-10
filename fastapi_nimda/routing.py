@@ -205,6 +205,7 @@ async def action_post(
     async with request.form() as form:
         action_name = str(form.get("action", "")).strip()
         keys = [key for key in str(form.get("keys", "")).split(",") if key]
+    normalized_keys = modeladmin.normalize_primary_key_values(keys)
 
     if not action_name:
         add_template_message(
@@ -234,7 +235,7 @@ async def action_post(
     )
     with Session(request.app.engine) as session:
         records = (
-            session.execute(modeladmin.get_multi_record_query_stmt(keys=keys))
+            session.execute(modeladmin.get_multi_record_query_stmt(keys=normalized_keys))
             .scalars()
             .all()
         )
@@ -370,12 +371,13 @@ async def edit_post(
     key: str = Path(...),
 ) -> Any:
     modeladmin = resource.modeladmin
+    normalized_key = modeladmin.normalize_primary_key_value(key)
     _ensure_permission(
         modeladmin.has_edit_permission(request, record),
         f"{modeladmin.get_label()}: updating records is not permitted",
     )
     database_table_name = modeladmin.model.__table__.name
-    result = await update_record(request, modeladmin, key)
+    result = await update_record(request, modeladmin, normalized_key)
     if not result.succeeded:
         if isinstance(result.error, SQLAlchemyError):
             message = get_sqlalchemy_error_message(database_table_name, result.error)

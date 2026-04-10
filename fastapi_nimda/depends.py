@@ -40,9 +40,10 @@ def get_record(
     if resource is None or key is None:
         return None
 
+    normalized_key = resource.modeladmin.normalize_primary_key_value(key)
     with Session(request.app.engine) as session:
         return session.execute(
-            resource.modeladmin.get_single_record_query_stmt(key=[key])
+            resource.modeladmin.get_single_record_query_stmt(key=[normalized_key])
         ).scalar_one_or_none()
 
 
@@ -54,10 +55,11 @@ def get_records(
     if resource is None:
         return None
 
+    normalized_keys = resource.modeladmin.normalize_primary_key_values(keys.split(","))
     with Session(request.app.engine) as session:
         return (
             session.execute(
-                resource.modeladmin.get_multi_record_query_stmt(keys=keys.split(","))
+                resource.modeladmin.get_multi_record_query_stmt(keys=normalized_keys)
             )
             .scalars()
             .all()

@@ -75,6 +75,12 @@ def summarize_sqlalchemy_error(
     unique_match = re.search(
         r"UNIQUE constraint failed: (?P<fields>.+)$", raw_message, re.IGNORECASE
     )
+    if unique_match is None:
+        unique_match = re.search(
+            r"duplicate key value violates unique constraint .*?\((?P<fields>.+?)\)=",
+            raw_message,
+            re.IGNORECASE,
+        )
     if unique_match:
         field_names = strip_table_prefix(
             [field.strip() for field in unique_match.group("fields").split(",")]
@@ -87,6 +93,12 @@ def summarize_sqlalchemy_error(
     not_null_match = re.search(
         r"NOT NULL constraint failed: (?P<field>.+)$", raw_message, re.IGNORECASE
     )
+    if not_null_match is None:
+        not_null_match = re.search(
+            r'null value in column "(?P<field>[^"]+)"',
+            raw_message,
+            re.IGNORECASE,
+        )
     if not_null_match:
         field_names = strip_table_prefix([not_null_match.group("field").strip()])
         return DatabaseErrorSummary(
@@ -94,7 +106,11 @@ def summarize_sqlalchemy_error(
             field_names=field_names,
         )
 
-    if re.search(r"FOREIGN KEY constraint failed", raw_message, re.IGNORECASE):
+    if re.search(
+        r"FOREIGN KEY constraint failed|violates foreign key constraint",
+        raw_message,
+        re.IGNORECASE,
+    ):
         return DatabaseErrorSummary(
             message="Foreign key constraint failed. Choose an existing related record.",
             field_names=[],
@@ -125,8 +141,14 @@ def get_sqlalchemy_error_message(table_name: str, exc: SQLAlchemyError) -> str:
 
 def get_missing_table_name(exc: SQLAlchemyError) -> str | None:
     match = re.search(r"no such table: ([^\s]+)", str(exc), re.IGNORECASE)
+    if match is None:
+        match = re.search(
+            r'relation "(?P<table>[^"]+)" does not exist',
+            str(exc),
+            re.IGNORECASE,
+        )
     if match:
-        return match.group(1)
+        return match.groupdict().get("table") or match.group(1)
     return None
 
 

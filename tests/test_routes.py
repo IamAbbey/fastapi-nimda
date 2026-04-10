@@ -58,6 +58,13 @@ def test_edit_route_updates_record_and_redirects(sa_client, sa_engine, seed_sa_d
         assert hero.secret_name == "Matches Malone"
 
 
+def test_view_route_accepts_string_path_for_integer_primary_key(sa_client, seed_sa_data):
+    response = sa_client.get("/admin/heroes/view/1")
+
+    assert response.status_code == 200
+    assert "Batman" in response.text
+
+
 def test_view_route_renders_success_message_after_create(sa_client, seed_sa_data):
     response = sa_client.get("/admin/heroes/view/1?n_r=1")
 

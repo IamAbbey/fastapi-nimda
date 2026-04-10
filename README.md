@@ -55,6 +55,18 @@ admin.register(Hero, HeroAdmin)
 
 After registration, the admin site is mounted at `/admin`.
 
+PostgreSQL works through a normal SQLAlchemy engine as well, for example:
+
+```python
+engine = create_engine("postgresql+psycopg://postgres:postgres@localhost:5432/app")
+```
+
+Install a PostgreSQL driver in the app environment first, for example:
+
+```bash
+uv add "fastapi-nimda[postgres]"
+```
+
 ## Integration Model
 
 The expected setup flow is:
@@ -117,7 +129,7 @@ The following should currently be treated as unsupported or not yet stable:
 - one-to-many collection fields in admin forms
 - complex foreign-key arrangements, including one column targeting multiple foreign keys
 - ORM shapes that do not define the expected relationship objects alongside foreign keys
-- database backends that do not behave like the currently assumed SQLAlchemy and SQLite path
+- database backends that diverge from the currently tested SQLAlchemy sync-engine path
 - production-grade extension guarantees around hooks, permissions, and customization APIs
 
 ## Project Status

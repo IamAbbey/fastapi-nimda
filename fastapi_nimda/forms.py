@@ -238,5 +238,7 @@ class AdminForm:
                     and isinstance(normalized_value, list)
                 ):
                     normalized_value = normalized_value[0] if normalized_value else None
-                response[destination_col] = normalized_value
+                response[destination_col] = self.modeladmin.normalize_field_value(
+                    destination_col, normalized_value
+                )
         return response
