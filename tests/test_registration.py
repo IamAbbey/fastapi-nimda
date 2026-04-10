@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import String
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from fastapi_nimda.admin import ModelAdmin
@@ -71,3 +72,16 @@ def test_model_admin_normalizes_integer_primary_keys(sa_engine):
     modeladmin = HeroAdmin(model=Hero, engine=sa_engine)
 
     assert modeladmin.normalize_primary_key_value("1") == 1
+
+
+def test_single_primary_key_queries_compile_for_postgresql(sa_engine):
+    modeladmin = HeroAdmin(model=Hero, engine=sa_engine)
+
+    compiled = str(
+        modeladmin.get_single_record_query_stmt(key=[1]).compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+    assert "WHERE heroes.id = 1" in compiled

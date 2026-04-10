@@ -17,6 +17,12 @@ class ModelQueryBuilder:
         primary_key_fields = self.modeladmin.get_model_primary_keys()
         return [getattr(self.model, field) for field in primary_key_fields]
 
+    def _primary_key_predicate(self, values: list[object]):
+        primary_key_columns = self.get_primary_key_as_model_column()
+        if len(primary_key_columns) == 1:
+            return primary_key_columns[0] == values[0]
+        return tuple_(*primary_key_columns) == tuple(values)
+
     def get_distinct_values_stmt(self, field_name: str):
         return select(distinct(getattr(self.model, field_name))).order_by(
             getattr(self.model, field_name)
@@ -84,14 +90,10 @@ class ModelQueryBuilder:
         return self._get_filtered_list_stmt(**kwargs).limit(self.modeladmin.page_size)
 
     def get_update_record_stmt(self, key: list[str]):
-        return update(self.model.__table__).where(
-            tuple_(*self.get_primary_key_as_model_column()) == key
-        )
+        return update(self.model.__table__).where(self._primary_key_predicate(key))
 
     def get_delete_record_stmt(self, key: list[str]):
-        return delete(self.model.__table__).where(
-            tuple_(*self.get_primary_key_as_model_column()) == key
-        )
+        return delete(self.model.__table__).where(self._primary_key_predicate(key))
 
     def get_insert_record_stmt(self):
         return insert(self.model.__table__).returning(
@@ -112,7 +114,7 @@ class ModelQueryBuilder:
             statement = statement.options(
                 *[selectinload(column) for column in selectinload_columns]
             )
-        return statement.where(tuple_(*self.get_primary_key_as_model_column()) == key)
+        return statement.where(self._primary_key_predicate(key))
 
     def get_multi_record_query_stmt(self, keys: list[str]):
         statement = select(self.model)

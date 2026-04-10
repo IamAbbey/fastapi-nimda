@@ -11,3 +11,6 @@ lint:
     uvx mypy .
     uvx ruff check .
     uvx ruff format . --check
+
+test:
+    uv run pytest
