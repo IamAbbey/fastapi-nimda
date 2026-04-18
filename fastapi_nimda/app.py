@@ -47,7 +47,9 @@ class FastAPINimda(FastAPI):
 
         app.mount("/admin", self)
         if isinstance(app, FastAPI):
-            app.add_api_route("/", self._redirect_to_admin_home, include_in_schema=False)
+            app.add_api_route(
+                "/", self._redirect_to_admin_home, include_in_schema=False
+            )
         self.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
         self.include_router(router)
 

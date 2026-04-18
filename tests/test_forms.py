@@ -85,7 +85,10 @@ def test_boolean_field_checkbox_renders_with_visible_checkbox_classes(sa_engine)
     )
 
     assert 'name="is_active"' in add_form_html
-    assert 'class="h-4 w-4 rounded border border-gray-300 bg-white text-blue-600 focus:ring-2 focus:ring-blue-500"' in add_form_html
+    assert (
+        'class="h-4 w-4 rounded border border-gray-300 bg-white text-blue-600 focus:ring-2 focus:ring-blue-500"'
+        in add_form_html
+    )
     assert 'name="is_active"' in edit_form_html
     assert "checked" in edit_form_html
 
