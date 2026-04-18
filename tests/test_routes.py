@@ -19,6 +19,16 @@ def test_admin_index_lists_registered_resources(sa_client):
     assert "Region" in response.text
 
 
+def test_root_redirects_to_admin_home(sa_admin_app):
+    app, _ = sa_admin_app
+
+    with TestClient(app) as client:
+        response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/admin/"
+
+
 def test_list_view_renders_seeded_rows(sa_client, seed_sa_data):
     response = sa_client.get("/admin/heroes/list/")
 

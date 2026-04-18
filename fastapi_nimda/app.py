@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.responses import RedirectResponse
 from starlette.types import ASGIApp
 
 from fastapi_nimda.types import AdminSite
@@ -45,6 +46,8 @@ class FastAPINimda(FastAPI):
         self.models: list[object] = []
 
         app.mount("/admin", self)
+        if isinstance(app, FastAPI):
+            app.add_api_route("/", self._redirect_to_admin_home, include_in_schema=False)
         self.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
         self.include_router(router)
 
@@ -52,6 +55,10 @@ class FastAPINimda(FastAPI):
         self.site: AdminSite = site or AdminSite()
         self.add_exception_handler(SQLAlchemyError, self._handle_sqlalchemy_error)
         self.add_exception_handler(FastAPINimdaError, self._handle_admin_error)
+
+    @staticmethod
+    async def _redirect_to_admin_home():
+        return RedirectResponse(url="/admin/", status_code=307)
 
     @property
     def register_resource(self):

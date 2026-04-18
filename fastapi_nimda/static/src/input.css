@@ -3,6 +3,7 @@
 @plugin "flowbite/plugin";
 
 @source "../../node_modules/flowbite";
+@source "../../fastapi_nimda/widgets.py";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -74,4 +75,14 @@ input:read-only {
 
 .select2-container--default .select2-selection--single .select2-selection__arrow {
   top: 8px
+}
+
+input[type='checkbox'] {
+  color: var(--color-blue-600) !important;
+  border: 1px solid var(--color-gray-500) !important;
+}
+
+input[type='checkbox']:checked {
+  color: var(--color-blue-600) !important;
+  border: none;
 }

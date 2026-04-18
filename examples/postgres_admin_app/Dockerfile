@@ -6,4 +6,4 @@ COPY . /app
 
 RUN pip install --no-cache-dir ".[postgres]"
 
-CMD ["uvicorn", "repro.postgres_admin_app.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "examples.postgres_admin_app.app:app", "--host", "0.0.0.0", "--port", "8000"]

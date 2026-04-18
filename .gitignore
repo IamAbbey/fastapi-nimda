@@ -8,3 +8,8 @@ build/
 *.db
 node_modules
 .tmp/
+.uv-*
+.mypy_cache
+.venv
+db/
+archive/

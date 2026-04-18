@@ -39,6 +39,7 @@ def inspect_model(model: type[DeclarativeBase]) -> ModelInspection:
     readonly_relation_fields: dict[str, str] = {}
     primary_key_columns = list(model.__table__.primary_key.columns)
     supported_form_fields: list[str] = []
+    relationship_backed_fk_fields: set[str] = set()
 
     if len(primary_key_columns) != 1:
         raise UnsupportedPrimaryKeyError(
@@ -91,7 +92,18 @@ def inspect_model(model: type[DeclarativeBase]) -> ModelInspection:
                 "reverse one-to-one relationships are read-only and cannot be used as admin form fields"
             )
             continue
+        relationship_backed_fk_fields.update(
+            local_column.key for local_column in column.local_columns
+        )
         supported_form_fields.append(column.key)
+
+    supported_form_fields = [
+        field_name
+        for field_name in supported_form_fields
+        if field_name not in relationship_backed_fk_fields
+        or field_name in table_columns
+        or field_name in primary_key_columns
+    ]
 
     return ModelInspection(
         table_columns=table_columns,

@@ -16,7 +16,7 @@ services:
   app:
     build:
       context: ../..
-      dockerfile: repro/postgres_admin_app/Dockerfile
+      dockerfile: examples/postgres_admin_app/Dockerfile
     environment:
       DATABASE_URL: postgresql+psycopg://nimda:nimda@db:5432/nimda
     depends_on:
